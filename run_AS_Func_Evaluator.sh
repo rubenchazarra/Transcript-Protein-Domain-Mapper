@@ -11,4 +11,4 @@ report_dir="${output_dir}/reports"
         -with-trace "${report_dir}/trace.txt" \
         -with-timeline "${report_dir}/timeline.html" \
 	-with-dag "${report_dir}/flowchart.png" \
-	-resume	
+	#-resume	
