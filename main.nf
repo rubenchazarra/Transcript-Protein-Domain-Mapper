@@ -40,11 +40,14 @@ ch_GTF_annot = Channel
 //	    	if (filename.indexOf(".tsv") > 0) "$filename"
 //	    	if (filename.indexOf(".txt") > 0) "$filename"
 //	    }
+//	MAX = 4
+//	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
+//	memory = { 16.GB + 20.GB * (task.attempt) }		
 //	
 //	input:
-//	set file(SUPPA_input) from ch_SUPPA_input
-//	set file(TPM_counts) from ch_TPM_counts
-//	set file(GTF_annot) from ch_GTF_annot
+//	file(SUPPA_input) from ch_SUPPA_input
+//	file(TPM_counts) from ch_TPM_counts
+//	file(GTF_annot) from ch_GTF_annot
 //	
 //	output:
 //	file("Transcript_list.Func_concordant.Coding.txt") into ch_transcript_list
@@ -77,7 +80,8 @@ process get_CDS {
 	publishDir "${params.outdir}/1.CDS_fasta", mode: 'copy'
 	MAX = 4
 	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
-	memory = { 16.GB + 20.GB * (task.attempt) }		
+	memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 1	
 	//when:
 	
 	input:
@@ -98,6 +102,7 @@ process get_CDS {
 process translate_CDS{
 	tag "translate CDS $transcript_ID"
 	publishDir "${params.outdir}/2.Protein_fasta", mode: 'copy'
+	memory = { 6.GB + 2.GB * (task.attempt) }		
 	
 	//when:
 	
@@ -118,6 +123,8 @@ process translate_CDS{
 process query_PFAM{
 	tag "query PFAM $transcript_ID"
 	publishDir "${params.outdir}/3.PFAM_query", mode: 'copy'
+	maxForks 1	
+	memory = { 6.GB + 2.GB * (task.attempt) }		
 	
 	//when:
 	
