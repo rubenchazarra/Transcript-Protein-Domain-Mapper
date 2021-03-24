@@ -150,21 +150,23 @@ process query_PFAM{
 }
 
 // Read PFAM output
-//process read_PFAM_output{
-//	tag "read PFAM output $transcript_ID"
-//	//publishDir "${params.outdir}/3.PFAM_query", mode: 'copy'
-//	
-//	//when:
-//	
-//	input:
-//	set val(transcript_ID), file(json_pfam) from ch_PFAM_output	
-//	
-//	output:
-//		
-//	script:
-//	def evalue_thres = params.query_PFAM.evalue_thres	
-//	"""
-//        /home/bsc83/bsc83930/miniconda3/bin/python3 /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/read.json.py\
-//		-json_file $json_pfam 
-//	"""
-//}
+process read_PFAM_output{
+	tag "read PFAM output $transcript_ID"
+	publishDir "${params.outdir}/4.PFAM_output_CSV",  mode: 'copy'
+	
+	//when:
+	
+	input:
+	set val(transcript_ID), file(json_pfam) from ch_PFAM_output	
+	
+	output:
+		
+	script:
+	"""
+       	module load R 
+	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/PFAM-output-JSON-to-csv.R \
+		--input_json $json_pfam \
+		--transcript_id $transcript_ID \
+		--output_table "${transcript_ID}-pfam.alignment.csv"
+	"""
+}
