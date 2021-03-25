@@ -9,21 +9,21 @@ option_list = list(
   make_option(
     c("-i", "--input_suppa"),
     action = "store",
-    default = "Ribosomal_proteins.AS_events.ioe.rds",
+    default = NA,
     type = 'character',
     help = 'Path to SUPPAs input in rds fomrat. This contains the Alternative Splicing event ids and metadata'
   ),
   make_option(
     c("-x", "--count_matrix"),
     action = "store",
-    default = "Ribosomal_proteins.Transcripts.tpm.rds",
+    default = NA,
     type = 'character',
     help = 'Path to TPM count matrix where rows are the event_ids contained in SUPPA file and columns are samples. In rds format.'
   ),
   make_option(
     c("-g", "--annot_gtf"),
     action = "store",
-    default = "gencode.v26.annotation.gtf",
+    default = NA,
     type = 'character',
     help = 'Path to Annotation GTF file.'
   ), 
@@ -153,9 +153,7 @@ extract.event.id.transcripts <- function(ioe.df, tpm.transcript){
                        
                        "Func_concord" = alt.gtf.data$transcript_type == total.gtf.data$transcript_type
                        , row.names = 1)
-  print("Iteration completed") 
-  return(out.df)
-
+  out.df
 }
 
 
@@ -191,10 +189,9 @@ write.table(func.no.concordance,opt$non_concordant, sep = "\t", quote = F, row.n
 ## Subset to Coding-Coding events
 func.concordance.coding = func.concordance[func.concordance$tr_1_Func == "protein_coding" & func.concordance$tr_2_Func == "protein_coding", ]
 ## Extract list of unique transcripts from the functional concordant and coding
-uniq.transcripts = unique(as.character(func.concordance.coding$tr_1_ID), as.character(func.concordance.coding$tr_2_ID))
+transcripts = c(as.character(func.concordance.coding$tr_1_ID), as.character(func.concordance.coding$tr_2_ID))
 ## Remove Gencode dot after transcript ID
-uniq.transcripts = unlist(lapply(strsplit(uniq.transcripts, "[.]"), function(x) x[1]))
-
+transcripts = unlist(lapply(strsplit(transcripts, "[.]"), function(x) x[1]))
+uniq.transcripts = unique(transcripts)
 # Save transcript List
 write.table(uniq.transcripts, opt$transcript_ids, quote = F, row.names = F,  col.names=FALSE)
-

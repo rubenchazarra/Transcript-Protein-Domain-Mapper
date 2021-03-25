@@ -123,8 +123,8 @@ process translate_CDS{
 process query_PFAM{
 	tag "query PFAM $transcript_ID"
 	publishDir "${params.outdir}/3.PFAM_query", mode: 'copy'
-	maxForks 1	
-	memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 4	
+	memory = { 16.GB + 2.GB * (task.attempt) }		
 	
 	//when:
 	
@@ -153,6 +153,8 @@ process query_PFAM{
 process read_PFAM_output{
 	tag "read PFAM output $transcript_ID"
 	publishDir "${params.outdir}/4.PFAM_output_CSV",  mode: 'copy'
+	maxForks 1	
+	memory = { 1.GB + 2.GB * (task.attempt) }		
 	
 	//when:
 	
@@ -160,7 +162,7 @@ process read_PFAM_output{
 	set val(transcript_ID), file(json_pfam) from ch_PFAM_output	
 	
 	output:
-		
+	file("${transcript_ID}-pfam.alignment.csv") into ch_merge_PFAM_output		
 	script:
 	"""
        	module load R 
@@ -168,5 +170,27 @@ process read_PFAM_output{
 		--input_json $json_pfam \
 		--transcript_id $transcript_ID \
 		--output_table "${transcript_ID}-pfam.alignment.csv"
+	"""
+}
+
+// Merge PFAM output
+process merge_PFAM_output{
+	tag "read PFAM output $transcript_ID"
+	publishDir "${params.outdir}/5.Merged_PFAM_ourpur/",  mode: 'copy'
+	maxForks 1	
+	memory = { 1.GB + 2.GB * (task.attempt) }		
+	
+	
+	input:
+	file("pfam/") from ch_merge_PFAM_output.collect()
+		
+	output:
+	file("${transcript_ID}-pfam.alignment.csv") 
+	script:
+	"""
+       	module load R 
+	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Merge-PFAM-alignments.R \
+		--input_pfam star/ \
+		--output_pfam_df "Merged-PFAM-output.csv"
 	"""
 }
