@@ -26,9 +26,9 @@ option_list = list(
 opt <- parse_args(OptionParser(option_list=option_list))
 
 # 1. List files in dir
-files = list.files(opt$input_pfam, pattern = ".csv", full.names = T)
-file.list = lapply(files, read.csv )
+files = list.files(opt$input_pfam, pattern = ".txt", full.names = T)
+file.list = lapply(files, read.table, sep = "\t", header = T)
 # 2. Merge files to single df
 pfam.df = Reduce(rbind, file.list)
 # 3. Save file
-write.csv(pfam.df, file = opt$output_pfam_df, quote = F, row.names = T)
+write.table(pfam.df, file = opt$output_pfam_df, sep = "\t", quote = F, row.names = T)

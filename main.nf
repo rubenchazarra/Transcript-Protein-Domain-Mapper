@@ -35,7 +35,7 @@ ch_GTF_annot = Channel
 // Process SUPPA output --> OUTCOMMENTING NOW TO RUN PIPELIN WITH PREVIOUSLY GENERATED TRANSCRIP LIST
 //process process_SUPPA {
 //	tag "Process SUPPA output"
-//	publishDir "${params.outdir}/1.SUPPA_process", mode: 'copy',
+//	publishDir "${params.outdir}/results-${params.run_tag}/1.SUPPA_process", mode: 'copy',
 //	    saveAs: {filename ->
 //	    	if (filename.indexOf(".tsv") > 0) "$filename"
 //	    	if (filename.indexOf(".txt") > 0) "$filename"
@@ -77,7 +77,7 @@ ch_transcriptID = Channel.fromPath(params.transcript_list).flatMap{ it.readLines
 
 process get_CDS {
 	tag "get CDS $transcript_ID"
-	publishDir "${params.outdir}/1.CDS_fasta", mode: 'copy'
+	publishDir "${params.outdir}/results-${params.run_tag}/1.CDS_fasta", mode: 'copy'
 	MAX = 4
 	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
 	memory = { 6.GB + 2.GB * (task.attempt) }		
@@ -101,7 +101,7 @@ process get_CDS {
 // Translate CDS sequence
 process translate_CDS{
 	tag "translate CDS $transcript_ID"
-	publishDir "${params.outdir}/2.Protein_fasta", mode: 'copy'
+	publishDir "${params.outdir}/results-${params.run_tag}/2.Protein_fasta", mode: 'copy'
 	memory = { 6.GB + 2.GB * (task.attempt) }		
 	
 	//when:
@@ -122,9 +122,9 @@ process translate_CDS{
 //Query PFAM database
 process query_PFAM{
 	tag "query PFAM $transcript_ID"
-	publishDir "${params.outdir}/3.PFAM_query", mode: 'copy'
+	publishDir "${params.outdir}/results-${params.run_tag}/3.PFAM_query", mode: 'copy'
 	maxForks 4	
-	memory = { 16.GB + 2.GB * (task.attempt) }		
+	memory = { 4.GB + 2.GB * (task.attempt) }		
 	
 	//when:
 	
@@ -152,31 +152,30 @@ process query_PFAM{
 // Read PFAM output
 process read_PFAM_output{
 	tag "read PFAM output $transcript_ID"
-	publishDir "${params.outdir}/4.PFAM_output_CSV",  mode: 'copy'
+	publishDir "${params.outdir}/results-${params.run_tag}/4.PFAM_output_CSV",  mode: 'copy'
 	maxForks 1	
-	memory = { 1.GB + 2.GB * (task.attempt) }		
-	
+	memory = { 2.GB + 2.GB * (task.attempt) }		
 	//when:
 	
 	input:
 	set val(transcript_ID), file(json_pfam) from ch_PFAM_output	
 	
 	output:
-	file("${transcript_ID}-pfam.alignment.csv") into ch_merge_PFAM_output		
+	file("${transcript_ID}-pfam.alignment.txt") into ch_merge_PFAM_output		
 	script:
 	"""
        	module load R 
 	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/PFAM-output-JSON-to-csv.R \
 		--input_json $json_pfam \
 		--transcript_id $transcript_ID \
-		--output_table "${transcript_ID}-pfam.alignment.csv"
+		--output_table "${transcript_ID}-pfam.alignment.txt"
 	"""
 }
 
 // Merge PFAM output
 process merge_PFAM_output{
-	tag "read PFAM output $transcript_ID"
-	publishDir "${params.outdir}/5.Merged_PFAM_ourpur/",  mode: 'copy'
+	tag "Merge PFAM outputs" 
+	publishDir "${params.outdir}/results-${params.run_tag}/5.Merged_PFAM_output/",  mode: 'copy'
 	maxForks 1	
 	memory = { 1.GB + 2.GB * (task.attempt) }		
 	
@@ -185,12 +184,12 @@ process merge_PFAM_output{
 	file("pfam/") from ch_merge_PFAM_output.collect()
 		
 	output:
-	file("${transcript_ID}-pfam.alignment.csv") 
+	file("Merged-PFAM-output.txt") 
 	script:
 	"""
        	module load R 
 	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Merge-PFAM-alignments.R \
-		--input_pfam star/ \
-		--output_pfam_df "Merged-PFAM-output.csv"
+		--input_pfam pfam/ \
+		--output_pfam_df "Merged-PFAM-output.txt"
 	"""
 }
