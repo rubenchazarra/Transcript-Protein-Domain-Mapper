@@ -16,21 +16,24 @@
 //	"""
 //
 //}
+
+// Input from SUPPA
 ch_SUPPA_input = Channel
         .fromPath("${params.input_files.input_suppa}", checkIfExists: true)
-        .ifEmpty { exit 1, "SUPPA input file found. Required!" }
+        .ifEmpty { exit 1, "SUPPA input file NOT found. Required!" }
 
+// Input TPM matrix
 ch_TPM_counts = Channel
         .fromPath("${params.input_files.tpm_counts}", checkIfExists: true)
-        .ifEmpty { exit 1, "TPM counts file found. Required!" }
+        .ifEmpty { exit 1, "TPM counts file NOT found. Required!" }
 
-ch_GTF_annot = Channel
-        .fromPath("${params.input_files.annot_gtf}", checkIfExists: true)
-        .ifEmpty { exit 1, "Gencode GTF annotation file found. Required!" }
+// Input GTF Annotation file
+ch_GTF_annot = Channel.fromPath("${params.input_files.annot_gtf}")
+        .ifEmpty { exit 1, "Gencode GTF annotation file NOT found. Required!" }
 
-//ch_SUPPA_input.view()
-//ch_TPM_counts.view()
-//ch_GTF_annot.view()
+// Genome fasta
+ch_genome_fasta = Channel.fromPath("${params.input_files.genome}")
+        .ifEmpty { exit 1, "Genome fasta file NOT found. Required!" }
 
 // Process SUPPA output --> OUTCOMMENTING NOW TO RUN PIPELIN WITH PREVIOUSLY GENERATED TRANSCRIP LIST
 //process process_SUPPA {
@@ -70,14 +73,14 @@ ch_GTF_annot = Channel
 //}
 
 // Read transcript ID list obtained from previous process 
-//ch_transcriptID = ch_transcript_list.flatMap{ it.readLines() }
 ch_transcriptID = Channel.fromPath(params.transcript_list).flatMap{ it.readLines() }
 
 //Get CDS sequences from trancript IDs from ENSEMBL REST API
+if(params.approach == "interactive"){
 
-process get_CDS {
-	tag "get CDS $transcript_ID"
-	publishDir "${params.outdir}/results-${params.run_tag}/1.CDS_fasta", mode: 'copy'
+process get_CDS_Ensembl_REST_API {
+	tag "get CDS $transcript_ID Ensembl REST API"
+	publishDir "${params.outdir}/results-${params.run_tag}/1.CDS_fasta-Ensembl-REST-API", mode: 'copy'
 	MAX = 4
 	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
 	memory = { 6.GB + 2.GB * (task.attempt) }		
@@ -101,7 +104,7 @@ process get_CDS {
 // Translate CDS sequence
 process translate_CDS{
 	tag "translate CDS $transcript_ID"
-	publishDir "${params.outdir}/results-${params.run_tag}/2.Protein_fasta", mode: 'copy'
+	publishDir "${params.outdir}/results-${params.run_tag}/2.Protein_fasta-BioPython", mode: 'copy'
 	memory = { 6.GB + 2.GB * (task.attempt) }		
 	
 	//when:
@@ -122,7 +125,7 @@ process translate_CDS{
 //Query PFAM database
 process query_PFAM{
 	tag "query PFAM $transcript_ID"
-	publishDir "${params.outdir}/results-${params.run_tag}/3.PFAM_query", mode: 'copy'
+	publishDir "${params.outdir}/results-${params.run_tag}/3.PFAM_query-REST-API", mode: 'copy'
 	maxForks 4	
 	memory = { 4.GB + 2.GB * (task.attempt) }		
 	
@@ -147,49 +150,87 @@ process query_PFAM{
 		--format json \
 		--outfile $transcript_ID
 	"""
+	}
+} else { // closing bracket from approach consition
+
+// Retrieve CDS sequence and protein sequence locally (no REST API)
+process get_CDS_and_Protein_local {
+	tag "get CDS $transcript_ID Local"
+	
+	// TODO: FIX: All files are going to 1.CDS_fasta-Local since .fasta suffix is present in the 2 files	
+	publishDir "${params.outdir}/results-${params.run_tag}/", mode: 'copy',
+	    saveAs: {filename ->
+	    	if (filename.indexOf(".fasta") > 0) "1.CDS_fasta-Local/$filename"
+	    	else if (filename.indexOf(".protein.fasta") > 0) "2.Protein_fasta-Local/$filename" 
+	    }
+	
+	MAX = 4
+	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
+	memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 1	
+	
+	input:
+	val transcript_ID from ch_transcriptID	
+	file GTF_file from ch_GTF_annot 	
+	file genome_fasta from ch_genome_fasta	
+	
+	output:
+	set val(transcript_ID), file("${transcript_ID}.protein.fasta") into ch_query_PFAM_local	
+	set val(transcript_ID), file("${transcript_ID}.fasta") 
+	
+	script:
+	"""
+	# 1. Subset GTF file
+	grep ${transcript_ID} ${GTF_file} > ${transcript_ID}.gtf 
+	# 2. Extract CDS and protein sequence from $genome_fasta 
+	/home/bsc83/bsc83930/miniconda3/bin/gffread -g ${genome_fasta} ${transcript_ID}.gtf \
+		-x ${transcript_ID}.fasta \
+		-y ${transcript_ID}.protein.fasta \
+	"""
+	}
 }
 
 // Read PFAM output
-process read_PFAM_output{
-	tag "read PFAM output $transcript_ID"
-	publishDir "${params.outdir}/results-${params.run_tag}/4.PFAM_output_CSV",  mode: 'copy'
-	maxForks 1	
-	memory = { 2.GB + 2.GB * (task.attempt) }		
-	//when:
-	
-	input:
-	set val(transcript_ID), file(json_pfam) from ch_PFAM_output	
-	
-	output:
-	file("${transcript_ID}-pfam.alignment.txt") into ch_merge_PFAM_output		
-	script:
-	"""
-       	module load R 
-	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/PFAM-output-JSON-to-csv.R \
-		--input_json $json_pfam \
-		--transcript_id $transcript_ID \
-		--output_table "${transcript_ID}-pfam.alignment.txt"
-	"""
-}
-
-// Merge PFAM output
-process merge_PFAM_output{
-	tag "Merge PFAM outputs" 
-	publishDir "${params.outdir}/results-${params.run_tag}/5.Merged_PFAM_output/",  mode: 'copy'
-	maxForks 1	
-	memory = { 1.GB + 2.GB * (task.attempt) }		
-	
-	
-	input:
-	file("pfam/") from ch_merge_PFAM_output.collect()
-		
-	output:
-	file("Merged-PFAM-output.txt") 
-	script:
-	"""
-       	module load R 
-	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Merge-PFAM-alignments.R \
-		--input_pfam pfam/ \
-		--output_pfam_df "Merged-PFAM-output.txt"
-	"""
-}
+//process read_PFAM_output{
+//	tag "read PFAM output $transcript_ID"
+//	publishDir "${params.outdir}/results-${params.run_tag}/4.PFAM_output_CSV",  mode: 'copy'
+//	maxForks 1	
+//	memory = { 2.GB + 2.GB * (task.attempt) }		
+//	//when:
+//	
+//	input:
+//	set val(transcript_ID), file(json_pfam) from ch_PFAM_output	
+//	
+//	output:
+//	file("${transcript_ID}-pfam.alignment.txt") into ch_merge_PFAM_output		
+//	script:
+//	"""
+//       	module load R 
+//	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/PFAM-output-JSON-to-csv.R \
+//		--input_json $json_pfam \
+//		--transcript_id $transcript_ID \
+//		--output_table "${transcript_ID}-pfam.alignment.txt"
+//	"""
+//}
+//
+//// Merge PFAM output
+//process merge_PFAM_output{
+//	tag "Merge PFAM outputs" 
+//	publishDir "${params.outdir}/results-${params.run_tag}/5.Merged_PFAM_output/",  mode: 'copy'
+//	maxForks 1	
+//	memory = { 1.GB + 2.GB * (task.attempt) }		
+//	
+//	
+//	input:
+//	file("pfam/") from ch_merge_PFAM_output.collect()
+//		
+//	output:
+//	file("Merged-PFAM-output.txt") 
+//	script:
+//	"""
+//       	module load R 
+//	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Merge-PFAM-alignments.R \
+//		--input_pfam pfam/ \
+//		--output_pfam_df "Merged-PFAM-output.txt"
+//	"""
+//}
