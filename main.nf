@@ -153,6 +153,10 @@ process query_PFAM{
 	}
 } else { // closing bracket from approach consition
 
+// We have to do a bit of channel engineering here: 
+// Combine each transcript ID with the genome_fasta and GTF_file
+ch_local_transcript_ID = ch_transcriptID. combine( ch_genome_fasta ) .combine ( ch_GTF_annot )
+
 // Retrieve CDS sequence and protein sequence locally (no REST API)
 process get_CDS_and_Protein_local {
 	tag "get CDS $transcript_ID Local"
@@ -170,9 +174,7 @@ process get_CDS_and_Protein_local {
 	maxForks 1	
 	
 	input:
-	val transcript_ID from ch_transcriptID	
-	file GTF_file from ch_GTF_annot 	
-	file genome_fasta from ch_genome_fasta	
+	set val(transcript_ID), file(genome_fasta), file(GTF_file) from ch_local_transcript_ID	
 	
 	output:
 	set val(transcript_ID), file("${transcript_ID}.protein.fasta") into ch_query_PFAM_local	
