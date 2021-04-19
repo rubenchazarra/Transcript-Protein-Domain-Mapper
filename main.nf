@@ -190,6 +190,36 @@ process get_CDS_and_Protein_local {
 		-y ${transcript_ID}.protein.fasta \
 	"""
 	}
+
+process query_PFAM_local {
+	tag "Query PFAM $transcript_ID Local"
+	
+	publishDir "${params.outdir}/results-${params.run_tag}/", mode: 'copy',
+	    saveAs: {filename ->
+	    	if (filename.indexOf(".txt") > 0) "3.PFAM_query-Local/$filename"
+	    }
+	
+	MAX = 4
+	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
+	memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 1	
+	
+	input:
+	set val(transcript_ID), file(protein_fasta) from ch_query_PFAM_local	
+	
+	output:
+	set val(transcript_ID), file("${transcript_ID}.pfam.out.txt") into ch_PFAM_output_local	
+	
+	script:
+	def local_PFAM_DB = params.query_PFAM.local_PFAM_DB	
+	"""
+	/home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/local-install-HMMER/hmmer-3.3.2/bin/hmmscan --domtblout "${transcript_ID}.pfam.out.txt" \
+		-E 1e-5 \
+		--cpu 4 \
+		${local_PFAM_DB} \
+		${protein_fasta} \
+	"""
+	}
 }
 
 // Read PFAM output
