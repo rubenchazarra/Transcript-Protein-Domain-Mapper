@@ -151,7 +151,32 @@ process query_PFAM{
 		--outfile $transcript_ID
 	"""
 	}
+// Read PFAM output
+process read_PFAM_output{
+	tag "read PFAM output $transcript_ID"
+	publishDir "${params.outdir}/results-${params.run_tag}/4.PFAM_output_CSV",  mode: 'copy'
+	maxForks 1	
+	memory = { 2.GB + 2.GB * (task.attempt) }		
+	//when:
+	
+	input:
+	set val(transcript_ID), file(json_pfam) from ch_PFAM_output	
+	
+	output:
+	file("${transcript_ID}-pfam.alignment.txt") into ch_merge_PFAM_output		
+	script:
+	"""
+       	module load R 
+	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/PFAM-output-JSON-to-csv.R \
+		--input_json $json_pfam \
+		--transcript_id $transcript_ID \
+		--output_table "${transcript_ID}-pfam.alignment.txt"
+	"""
+	}
+
+
 } else { // closing bracket from approach consition
+
 
 // We have to do a bit of channel engineering here: 
 // Combine each transcript ID with the genome_fasta and GTF_file
@@ -220,49 +245,55 @@ process query_PFAM_local {
 		${protein_fasta} \
 	"""
 	}
+
+process read_PFAM_local {
+	tag "Read PFAM $transcript_ID Local"
+	
+	publishDir "${params.outdir}/results-${params.run_tag}/", mode: 'copy',
+	    saveAs: {filename ->
+	    	if (filename.indexOf(".txt") > 0) "4.PFAM-output-CSV/$filename"
+	    }
+	
+	MAX = 4
+	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
+	memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 1	
+	
+	input:
+	set val(transcript_ID), file(pfam_alignment) from ch_PFAM_output_local	
+	
+	output:
+	set val(transcript_ID), file("${transcript_ID}-pfam.alignment.txt") into ch_merge_PFAM_output
+	
+	script:
+	"""
+       	module load R 
+	/home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/PFAM-output-dmtblout-to-csv.R \
+		--input_file  ${pfam_alignment} \
+		--transcript_id ${transcript_ID} \
+		--output_table  "${transcript_ID}-pfam.alignment.txt" \
+	"""
+	}
 }
 
-// Read PFAM output
-//process read_PFAM_output{
-//	tag "read PFAM output $transcript_ID"
-//	publishDir "${params.outdir}/results-${params.run_tag}/4.PFAM_output_CSV",  mode: 'copy'
-//	maxForks 1	
-//	memory = { 2.GB + 2.GB * (task.attempt) }		
-//	//when:
-//	
-//	input:
-//	set val(transcript_ID), file(json_pfam) from ch_PFAM_output	
-//	
-//	output:
-//	file("${transcript_ID}-pfam.alignment.txt") into ch_merge_PFAM_output		
-//	script:
-//	"""
-//       	module load R 
-//	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/PFAM-output-JSON-to-csv.R \
-//		--input_json $json_pfam \
-//		--transcript_id $transcript_ID \
-//		--output_table "${transcript_ID}-pfam.alignment.txt"
-//	"""
-//}
-//
 //// Merge PFAM output
-//process merge_PFAM_output{
-//	tag "Merge PFAM outputs" 
-//	publishDir "${params.outdir}/results-${params.run_tag}/5.Merged_PFAM_output/",  mode: 'copy'
-//	maxForks 1	
-//	memory = { 1.GB + 2.GB * (task.attempt) }		
-//	
-//	
-//	input:
-//	file("pfam/") from ch_merge_PFAM_output.collect()
-//		
-//	output:
-//	file("Merged-PFAM-output.txt") 
-//	script:
-//	"""
-//       	module load R 
-//	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Merge-PFAM-alignments.R \
-//		--input_pfam pfam/ \
-//		--output_pfam_df "Merged-PFAM-output.txt"
-//	"""
-//}
+process merge_PFAM_output{
+	tag "Merge PFAM outputs" 
+	publishDir "${params.outdir}/results-${params.run_tag}/5.Merged_PFAM_output/",  mode: 'copy'
+	maxForks 1	
+	memory = { 1.GB + 2.GB * (task.attempt) }		
+	
+	
+	input:
+	file("pfam/") from ch_merge_PFAM_output.collect()
+		
+	output:
+	file("Merged-PFAM-output.txt") 
+	script:
+	"""
+       	module load R 
+	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Merge-PFAM-alignments.R \
+		--input_pfam pfam/ \
+		--output_pfam_df "Merged-PFAM-output.txt"
+	"""
+}
