@@ -2,6 +2,7 @@
 
 ## Script to map PFAM domain alignment coordinates to genomic coordinates.
 
+suppressPackageStartupMessages(require(optparse))
 ## TODO --> Implement the condition where the PFAM alignment is empty. We still want to get the genomic coordinates of the protein, but we need the length of the protein sequence.
 option_list = list(
   make_option(
@@ -12,11 +13,11 @@ option_list = list(
     help = 'PFAM alignment file'
   ), 
   make_option(
-    c("-i", "--protein_id"),
+    c("-t", "--transcript_id"),
     action = "store",
     default = NA,
     type = 'character',
-    help = 'Ensembl protein identifier of the query transcript. Extracted from GTF.'
+    help = 'Ensembl Transcript ID'
   ), 
   make_option(
     c("-o", "--output_coord"),
@@ -31,9 +32,7 @@ opt <- parse_args(OptionParser(option_list=option_list))
 
 suppressPackageStartupMessages(require(ensembldb))
 suppressPackageStartupMessages(require(EnsDb.Hsapiens.v86))
-
-
-
+suppressPackageStartupMessages(require(rtracklayer))
 
 ## Functions ##
 create.iranges.pfam <- function(pfam_alignment, protein_id){
@@ -75,15 +74,35 @@ extract.genomic.coord.pfam.alignment <- function(pfam_alignment, protein_id, edb
   return(prot.genome.coord.df)
 }
 
+get.protein_id.from.transcript_id <- function(transcript_id, ensembl_mart){
+  ## Retrieve Ensembl protein ID from Ensembl transcript ID
+  prot.id <- getBM(attributes=c('ensembl_transcript_id','ensembl_peptide_id'),   
+                  filters = c('ensembl_transcript_id'), 
+                  values = transcript_id,
+                  mart = ensembl, 
+                  useCache = F)
+  if(nrow(prot.id) == 0){
+    protein_id <- "ENSP.Not.Available"
+  }else{
+    protein_id <- prot.id[["ensembl_peptide_id"]]
+  }
+  return(protein_id)
+}
+
 # 0. Params
-protein_id <- opt$protein_id
+transcript_id <- opt$transcript_id
+## Get protein ID from Ensembl based on Transcript ID
+suppressPackageStartupMessages(require(biomaRt))
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+protein_id <- get.protein_id.from.transcript_id(transcript_id = transcript_id, ensembl_mart = ensembl)
+
 ## 0.1. Database object
 edbx <- EnsDb.Hsapiens.v86
 
 # 1. Read files
 pfam.alignment <- read.table(opt$pfam_alignment, header = T)
 # 2. Extract genomic coordinates from PFAM alignments
-genomic.coord.list <- apply(pfam_alignment, 1, function(x) 
+genomic.coord.list <- apply(pfam.alignment, 1, function(x) 
   extract.genomic.coord.pfam.alignment(pfam_alignment = x, protein_id = protein_id, edbx = edbx))
 ## Merge
 genomic.coord.df <- Reduce(rbind, genomic.coord.list)

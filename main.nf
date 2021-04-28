@@ -80,7 +80,7 @@ if(params.approach == "interactive"){
 
 process get_CDS_Ensembl_REST_API {
 	tag "get CDS $transcript_ID Ensembl REST API"
-	publishDir "${params.outdir}/results-${params.run_tag}/1.CDS_fasta-Ensembl-REST-API", mode: 'copy'
+	publishDir "${params.outdir}/${params.run_tag}/1.CDS_fasta-Ensembl-REST-API", mode: 'copy'
 	MAX = 4
 	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
 	memory = { 6.GB + 2.GB * (task.attempt) }		
@@ -104,7 +104,7 @@ process get_CDS_Ensembl_REST_API {
 // Translate CDS sequence
 process translate_CDS{
 	tag "translate CDS $transcript_ID"
-	publishDir "${params.outdir}/results-${params.run_tag}/2.Protein_fasta-BioPython", mode: 'copy'
+	publishDir "${params.outdir}/${params.run_tag}/2.Protein_fasta-BioPython", mode: 'copy'
 	memory = { 6.GB + 2.GB * (task.attempt) }		
 	
 	//when:
@@ -125,7 +125,7 @@ process translate_CDS{
 //Query PFAM database
 process query_PFAM{
 	tag "query PFAM $transcript_ID"
-	publishDir "${params.outdir}/results-${params.run_tag}/3.PFAM_query-REST-API", mode: 'copy'
+	publishDir "${params.outdir}/${params.run_tag}/3.PFAM_query-REST-API", mode: 'copy'
 	maxForks 4	
 	memory = { 4.GB + 2.GB * (task.attempt) }		
 	
@@ -154,7 +154,7 @@ process query_PFAM{
 // Read PFAM output
 process read_PFAM_output{
 	tag "read PFAM output $transcript_ID"
-	publishDir "${params.outdir}/results-${params.run_tag}/4.PFAM_output_CSV",  mode: 'copy'
+	publishDir "${params.outdir}/${params.run_tag}/4.PFAM_output_CSV",  mode: 'copy'
 	maxForks 1	
 	memory = { 2.GB + 2.GB * (task.attempt) }		
 	//when:
@@ -187,7 +187,7 @@ process get_CDS_and_Protein_local {
 	tag "get CDS $transcript_ID Local"
 	
 	// TODO: FIX: All files are going to 1.CDS_fasta-Local since .fasta suffix is present in the 2 files	
-	publishDir "${params.outdir}/results-${params.run_tag}/", mode: 'copy',
+	publishDir "${params.outdir}/${params.run_tag}/", mode: 'copy',
 	    saveAs: {filename ->
 	    	if (filename.indexOf(".fasta") > 0) "1.CDS_fasta-Local/$filename"
 	    	else if (filename.indexOf(".protein.fasta") > 0) "2.Protein_fasta-Local/$filename" 
@@ -202,7 +202,7 @@ process get_CDS_and_Protein_local {
 	set val(transcript_ID), file(genome_fasta), file(GTF_file) from ch_local_transcript_ID	
 	
 	output:
-	set val(transcript_ID), val(protein_ID), file("${transcript_ID}.protein.fasta") into ch_query_PFAM_local	
+	set val(transcript_ID), file("${transcript_ID}.gtf"), file("${transcript_ID}.protein.fasta") into ch_query_PFAM_local	
 	set val(transcript_ID), file("${transcript_ID}.fasta") 
 	
 	script:
@@ -211,9 +211,8 @@ process get_CDS_and_Protein_local {
 	grep ${transcript_ID} ${GTF_file} > ${transcript_ID}.gtf
 	## TODO --> Improve protein_ID extraction procedure from GTF
 	# 2. Extract protein ID
-	# TODO --> Change this AWK approachj to avoid token recognition error at: '('	
-	protein_ID=$(awk '$3 == "transcript" { print $24 }' ${transcript_ID}.gtf)
-	protein_ID=$(echo $protein_id |  grep -o -P '(?<=").*(?=\.)')	 
+	# TODO --> Change this AWK approach since it has give us a lot of headaches 
+	#protein_ID=\$(awk '\$3 == "transcript" { print \$24 }' ${transcript_ID}.gtf)   
 	# 2. Extract CDS and protein sequence from $genome_fasta 
 	/home/bsc83/bsc83930/miniconda3/bin/gffread -g ${genome_fasta} ${transcript_ID}.gtf \
 		-x ${transcript_ID}.fasta \
@@ -224,7 +223,7 @@ process get_CDS_and_Protein_local {
 process query_PFAM_local {
 	tag "Query PFAM $transcript_ID Local"
 	
-	publishDir "${params.outdir}/results-${params.run_tag}/", mode: 'copy',
+	publishDir "${params.outdir}/${params.run_tag}/", mode: 'copy',
 	    saveAs: {filename ->
 	    	if (filename.indexOf(".txt") > 0) "3.PFAM_query-Local/$filename"
 	    }
@@ -235,10 +234,10 @@ process query_PFAM_local {
 	maxForks 1	
 	
 	input:
-	set val(transcript_ID), val(protein_ID), file(protein_fasta) from ch_query_PFAM_local	
+	set val(transcript_ID), file(transcript_GTF_file), file(protein_fasta) from ch_query_PFAM_local	
 	
 	output:
-	set val(transcript_ID), val(protein_ID), file("${transcript_ID}.pfam.out.txt") into ch_PFAM_output_local	
+	set val(transcript_ID), file(transcript_GTF_file), file("${transcript_ID}.pfam.out.txt") into ch_PFAM_output_local	
 	
 	script:
 	def local_PFAM_DB = params.query_PFAM.local_PFAM_DB	
@@ -254,7 +253,7 @@ process query_PFAM_local {
 process read_PFAM_local {
 	tag "Read PFAM $transcript_ID Local"
 	
-	publishDir "${params.outdir}/results-${params.run_tag}/", mode: 'copy',
+	publishDir "${params.outdir}/${params.run_tag}/", mode: 'copy',
 	    saveAs: {filename ->
 	    	if (filename.indexOf(".txt") > 0) "4.PFAM-output-CSV/$filename"
 	    }
@@ -265,10 +264,10 @@ process read_PFAM_local {
 	maxForks 1	
 	
 	input:
-	set val(transcript_ID), val(protein_ID), file(pfam_alignment) from ch_PFAM_output_local	
+	set val(transcript_ID), file(transcript_GTF_file), file(pfam_alignment) from ch_PFAM_output_local	
 	
 	output:
-	set val(transcript_ID), val(protein_ID), file("${transcript_ID}-pfam.alignment.txt") into ch_merge_PFAM_output
+	set val(transcript_ID), file(transcript_GTF_file), file("${transcript_ID}-pfam.alignment.txt") into ch_merge_PFAM_output
 	
 	script:
 	"""
@@ -283,41 +282,10 @@ process read_PFAM_local {
 // Channel duplication 
 ch_merge_PFAM_output.into{ ch_genomic_coord_PFAM; ch_merge_PFAM_alignments }
 
-// Extract PFAM alignment genomic coordinates
-process extract_genomic_coord {
-	tag "Extract genomic coordinates $transcript_ID"
-	
-	publishDir "${params.outdir}/results-${params.run_tag}/", mode: 'copy',
-	    saveAs: {filename ->
-	    	if (filename.indexOf(".txt") > 0) "5.Genomic-coord-PFAM/$filename"
-	    }
-	
-	MAX = 4
-	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
-	memory = { 6.GB + 2.GB * (task.attempt) }		
-	maxForks 1	
-	
-	input:
-	set val(transcript_ID), val(protein_ID), file(pfam_alignment) from ch_genomic_coord_PFAM	
-	
-	output:
-	set val(transcript_ID), val(protein_ID), file("${transcript_ID}-PFAM.genomic.coordinates.txt") into ch_merge_PFAM_coord
-	
-	script:
-	"""
-       	module load R 
-	/home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Map-PFAM-genomic-coord.R \
-		--pfam_alignment ${pfam_alignment} \
-		--protein_id  ${protein_id} \
-		--output_coord  "${transcript_ID}-PFAM.genomic.coordinates.txt" \
-	"""
-	}
-}
-
 //// Merge PFAM output
 process merge_PFAM_output{
 	tag "Merge PFAM outputs" 
-	publishDir "${params.outdir}/results-${params.run_tag}/5.Merged_PFAM_output/",  mode: 'copy'
+	publishDir "${params.outdir}/${params.run_tag}/4.Merged_PFAM_output/",  mode: 'copy'
 	maxForks 1	
 	memory = { 1.GB + 2.GB * (task.attempt) }		
 	
@@ -333,5 +301,58 @@ process merge_PFAM_output{
 	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Merge-PFAM-alignments.R \
 		--input_pfam pfam/ \
 		--output_pfam_df "Merged-PFAM-output.txt"
+	"""
+}
+
+// Extract PFAM alignment genomic coordinates
+process extract_genomic_coord {
+	tag "Extract genomic coordinates $transcript_ID"
+	
+	publishDir "${params.outdir}/${params.run_tag}/", mode: 'copy',
+	    saveAs: {filename ->
+	    	if (filename.indexOf(".txt") > 0) "5.Genomic-coord-PFAM/$filename"
+	    }
+	
+	MAX = 4
+	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
+	memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 1	
+	
+	input:
+	set val(transcript_ID), file(transcript_GTF_file), file(pfam_alignment) from ch_genomic_coord_PFAM	
+	
+	output:
+	set val(transcript_ID), file(transcript_GTF_file), file("${transcript_ID}-PFAM.genomic.coordinates.txt") into ch_merge_genomic_coord_PFAM
+	
+	script:
+	"""
+       	module load R 
+	/home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Map-PFAM-genomic-coord.R \
+		--pfam_alignment ${pfam_alignment} \
+		--transcript_id  ${transcript_ID} \
+		--output_coord  "${transcript_ID}-PFAM.genomic.coordinates.txt" \
+	"""
+	}
+}
+
+//// Merge Genomic coordinates output
+process merge_genomic_coord_PFAM {
+	tag "Merge PFAM outputs" 
+	publishDir "${params.outdir}/${params.run_tag}/5.Merged-Genomic-coord-PFAM/",  mode: 'copy'
+	maxForks 1	
+	memory = { 1.GB + 2.GB * (task.attempt) }		
+	
+	
+	input:
+	file("genomic-coord-pfam/") from ch_merge_genomic_coord_PFAM.collect()
+		
+	output:
+	file("Merged-Genomic-coord-PFAM-output.txt") 
+	script:
+	"""
+       	module load R 
+	Rscript /home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Merge-PFAM-alignments.R \
+		--input_pfam genomic-coord-pfam/ \
+		--output_pfam_df "Merged-Genomic-coord-PFAM-output.txt"
 	"""
 }
