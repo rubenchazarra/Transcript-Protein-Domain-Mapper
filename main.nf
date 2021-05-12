@@ -322,18 +322,51 @@ process extract_genomic_coord {
 	set val(transcript_ID), file(transcript_GTF_file), file(pfam_alignment) from ch_genomic_coord_PFAM	
 	
 	output:
-	set val(transcript_ID), file(transcript_GTF_file), file("${transcript_ID}-PFAM.genomic.coordinates.txt") into ch_merge_genomic_coord_PFAM
+	set val(transcript_ID), file(transcript_GTF_file), file("${transcript_ID}-PFAM.genomic.coordinates.txt") into ch_merge_genomic_coord_PFAM, ch_visualization_PFAM_alignemnt
 	
 	script:
 	"""
        	module load R 
-	/home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Map-PFAM-genomic-coord.R \
+	/home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Map-PFAM-genomic-coord-v2-11May2021.R \
 		--pfam_alignment ${pfam_alignment} \
 		--transcript_id  ${transcript_ID} \
 		--output_coord  "${transcript_ID}-PFAM.genomic.coordinates.txt" \
 	"""
 	}
 }
+
+// Visualize PFAM alignment
+process visualize_PFAM_alignment {
+	tag "Visualize PFAM alignment $transcript_ID"
+	
+	publishDir "${params.outdir}/${params.run_tag}/", mode: 'copy',
+	    saveAs: {filename ->
+	    	if (filename.indexOf(".rds") > 0) "6.Visualize-PFAM-alignment/$filename"
+	    	if (filename.indexOf(".txt") > 0) "6.Visualize-PFAM-alignment/$filename"
+	    }
+	
+	MAX = 4
+	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
+	memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 1
+	
+	input:
+	set val(transcript_ID), file(transcript_GTF_file), file(pfam_alignment) from ch_visualization_PFAM_alignemnt	
+	
+	output:
+	file("*.rds")
+	file("*.pdf")
+	
+	script:
+	"""
+       	module load R 
+	/home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/bin/Generate-GViz-Visualization-Tracks.R \
+		--pfam_alignment ${pfam_alignment} \
+		--transcript_id  ${transcript_ID} \
+		--viz_track_plot  "${transcript_ID}-Visualization-Gviz-TrackPlot.pdf" \
+		--viz_track_list  "${transcript_ID}-Visualization-Gviz-TrackPlot.rds" \
+	"""
+	}
 
 //// Merge Genomic coordinates output
 process merge_genomic_coord_PFAM {
