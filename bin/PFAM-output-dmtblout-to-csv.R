@@ -78,12 +78,6 @@ read.PFAM.domtblout <- function(file.path, transcript.id){
   return(pfam.df)
 }
 
-
-suppressPackageStartupMessages(require(rjson))
-
-## 0. Params
-
-
 # 1. Coerce dmtblout to table
 pfam.table <- read.PFAM.domtblout(file.path = opt$input_file, transcript.id = opt$transcript_id)
 # 2. Save table
