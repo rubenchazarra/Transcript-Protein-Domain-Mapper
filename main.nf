@@ -25,8 +25,8 @@ process get_CDS_Ensembl_REST_API {
 	publishDir "${params.outdir}/${params.run_tag}/1.CDS_fasta-Ensembl-REST-API", mode: 'copy'
 	MAX = 4
 	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
-	memory = { 6.GB + 2.GB * (task.attempt) }		
-	maxForks 4	
+	// memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 8	
 	//when:
 	
 	input:
@@ -47,7 +47,7 @@ process get_CDS_Ensembl_REST_API {
 process translate_CDS{
 	tag "translate CDS $transcript_ID"
 	publishDir "${params.outdir}/${params.run_tag}/2.Protein_fasta-BioPython", mode: 'copy'
-	memory = { 6.GB + 2.GB * (task.attempt) }		
+	// memory = { 6.GB + 2.GB * (task.attempt) }		
 	
 	//when:
 	
@@ -68,8 +68,8 @@ process translate_CDS{
 process query_PFAM{
 	tag "query PFAM $transcript_ID"
 	publishDir "${params.outdir}/${params.run_tag}/3.PFAM_query-REST-API", mode: 'copy'
-	maxForks 4	
-	memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 8	
+	// memory = { 6.GB + 2.GB * (task.attempt) }		
 	
 	//when:
 	
@@ -97,8 +97,8 @@ process query_PFAM{
 process read_PFAM_output{
 	tag "read PFAM output $transcript_ID"
 	publishDir "${params.outdir}/${params.run_tag}/4.PFAM_output_CSV",  mode: 'copy'
-	maxForks 4	
-	memory = { 4.GB + 2.GB * (task.attempt) }		
+	maxForks 8	
+	// memory = { 4.GB + 2.GB * (task.attempt) }		
 	//when:
 	
 	input:
@@ -137,8 +137,8 @@ process get_CDS_and_Protein_local {
 	
 	MAX = 4
 	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
-	memory = { 6.GB + 2.GB * (task.attempt) }		
-	maxForks 4	
+	// memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 8	
 	
 	input:
 	set val(transcript_ID), file(genome_fasta), file(GTF_file) from ch_local_transcript_ID	
@@ -172,8 +172,8 @@ process query_PFAM_local {
 	
 	MAX = 4
 	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
-	memory = { 6.GB + 2.GB * (task.attempt) }		
-	maxForks 4	
+	// memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 8	
 	
 	input:
 	set val(transcript_ID), file(transcript_GTF_file), file(protein_fasta) from ch_query_PFAM_local	
@@ -202,8 +202,8 @@ process read_PFAM_local {
 	
 	MAX = 4
 	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
-	memory = { 6.GB + 2.GB * (task.attempt) }		
-	maxForks 4	
+	// memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 8	
 	
 	input:
 	set val(transcript_ID), file(transcript_GTF_file), file(pfam_alignment) from ch_PFAM_output_local	
@@ -228,8 +228,8 @@ ch_merge_PFAM_output.into{ ch_genomic_coord_PFAM; ch_merge_PFAM_alignments }
 process merge_PFAM_output{
 	tag "Merge PFAM outputs" 
 	publishDir "${params.outdir}/${params.run_tag}/4.Merged_PFAM_output/",  mode: 'copy'
-	maxForks 4	
-	memory = { 1.GB + 2.GB * (task.attempt) }		
+	maxForks 8	
+	// memory = { 1.GB + 2.GB * (task.attempt) }		
 	
 	
 	input:
@@ -257,8 +257,8 @@ process map_genomic_coord {
 	
 	MAX = 4
 	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
-	memory = { 6.GB + 2.GB * (task.attempt) }		
-	maxForks 4	
+	// memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 8	
 	
 	input:
 	set val(transcript_ID), file(transcript_GTF_file), file(pfam_alignment) from ch_genomic_coord_PFAM	
@@ -290,8 +290,8 @@ process visualization {
 	
 	MAX = 4
 	errorStrategy { (task.exitStatus == 130 || task.exitStatus == 137) && task.attempt - 1 <= MAX ? 'retry' : 'ignore' }
-	memory = { 6.GB + 2.GB * (task.attempt) }		
-	maxForks 4
+	// memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 8
 	
 	input:
 	set val(transcript_ID), file(transcript_GTF_file), file(pfam_alignment) from ch_visualization	
@@ -316,8 +316,8 @@ process visualization {
 process merge_genomic_coord_PFAM {
 	tag "Merge PFAM outputs" 
 	publishDir "${params.outdir}/${params.run_tag}/5.Merged-Genomic-coord-PFAM/",  mode: 'copy'
-	maxForks 4	
-	memory = { 6.GB + 2.GB * (task.attempt) }		
+	maxForks 8	
+	// memory = { 6.GB + 2.GB * (task.attempt) }		
 	
 	
 	input:
