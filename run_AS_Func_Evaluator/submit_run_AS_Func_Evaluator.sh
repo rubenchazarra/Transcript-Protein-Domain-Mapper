@@ -14,8 +14,8 @@ report_dir="${output_dir}/reports"
         -with-trace "${report_dir}/trace.txt" \
         -with-timeline "${report_dir}/timeline.html" \
 	-with-dag "${report_dir}/flowchart.png" \
-	-profile slurm
-	-resume
+	-profile slurm \
+	#-resume
 
 echo "Starting at `date`"
 echo "Running on hosts: $SLURM_NODELIST"

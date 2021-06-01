@@ -98,21 +98,21 @@ extract.genomic.coord.pfam.alignment <- function(pfam_alignment, protein_id, edb
   return(prot.genome.coord.df)
 }
 
-get.protein_id.from.transcript_id <- function(transcript_id, ensembl_mart){
-  ## Retrieve Ensembl protein ID from Ensembl transcript ID
-  ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl") # <-- Hard-coded
-  prot.id <- getBM(attributes=c('ensembl_transcript_id','ensembl_peptide_id'),   
-                   filters = c('ensembl_transcript_id'), 
-                   values = transcript_id,
-                   mart = ensembl, 
-                   useCache = F)
-  if(nrow(prot.id) == 0){
-    protein_id <- "ENSP.Not.Available"
-  }else{
-    protein_id <- prot.id[["ensembl_peptide_id"]]
-  }
-  return(protein_id)
-}
+#get.protein_id.from.transcript_id <- function(transcript_id, ensembl_mart){
+#  ## Retrieve Ensembl protein ID from Ensembl transcript ID
+#  ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl") # <-- Hard-coded
+#  prot.id <- getBM(attributes=c('ensembl_transcript_id','ensembl_peptide_id'),   
+#                   filters = c('ensembl_transcript_id'), 
+#                   values = transcript_id,
+#                   mart = ensembl, 
+#                   useCache = F)
+#  if(nrow(prot.id) == 0){
+#    protein_id <- "ENSP.Not.Available"
+#  }else{
+#    protein_id <- prot.id[["ensembl_peptide_id"]]
+#  }
+#  return(protein_id)
+#}
 
 #get.chr.from.transcript_id.biomaRt <- function(transcript_id, ensembl_mart){
 #  ## Retrieve Ensembl chromosome from Ensembl transcript ID
@@ -190,4 +190,4 @@ genomic.coord.df[["seqnames"]] <- chr_name
 genomic.coord.df[["PFAM.alignment.ID"]] = paste0(genomic.coord.df[["PFAM.alignment.ID"]], "-", genomic.coord.df[["seqnames"]])
 
 # 6. Save 
-write.table(genomic.coord.df, file = opt$output_coord, quote = F)
+write.table(genomic.coord.df, file = opt$output_coord, quote = F, row.names = F, sep = "\t")

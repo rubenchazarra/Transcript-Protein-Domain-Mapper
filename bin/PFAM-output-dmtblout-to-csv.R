@@ -57,7 +57,7 @@ read.PFAM.domtblout <- function(file.path, transcript.id){
     ## 2.2. Alignment with content.
     #all.lines <- 1:length(line.list)
     #filled.lines <- all.lines[!all.lines %in% uncommented.lines]
-    pfam.align.df = read.table(file.path, comment.char = "#", sep = "", fill = TRUE, row.names=NULL)
+    pfam.align.df = read.table(file.path, comment.char = "#", sep = "", fill = TRUE, row.names=NULL, header = FALSE)
     ## Edits: last column ('pfam.description') is separated since it contains >1 words
     rm.desc.pfam.align.df <- pfam.align.df[, 1:22]
     pfam.desc.vec <- apply(pfam.align.df[, 23:ncol(pfam.align.df)], 1, paste , collapse = "_" )
