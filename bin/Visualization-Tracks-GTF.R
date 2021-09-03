@@ -28,6 +28,13 @@ option_list = list(
     help = 'Path to GTF annotation file.'
   ), 
   make_option(
+    c("-c", "--cytoBand"),
+    action = "store",
+    default = NA,
+    type = 'character',
+    help = 'Path to the UCSC Browser Cyto Band table. To download cytoband files for genomes hosted at UCSC, see the UCSC Table Browser, and select Group="All Tables" and Table="cytoBand".'
+  ), 
+  make_option(
     c("-o", "--viz_track_list"),
     action = "store",
     default = NA,
@@ -67,18 +74,18 @@ gtf_processing <- function(gtf, transcript_id){
   return(transcriptModel)
 }
 
-generate_transcript_track <- function(transcriptModel, genome, transcript_id){
+generate_transcript_track <- function(transcriptModel, genome, transcript_id, UCSC_cytoBand){
   chr <- unique(as.character(transcriptModel$seqnames))
   # Loop across 'transcript_ids' we have more than one in PFAM alignments
   atrack_list <- list()
-  for(id in transcript_id){
+  for(id in transcript_id){ # Note: this is looped because later we are using the same fubction for the PFAM alignments (where there may be more than one) 
     sub_transcriptModel <- transcriptModel[transcriptModel$symbol == id, ]
     track_name <- unique(sub_transcriptModel$symbol)
     atrack_list[[id]] <- GeneRegionTrack(sub_transcriptModel, genome = genome, chr = chr, name = track_name, cex.axis = 15)
   }
    
   gtrack <- GenomeAxisTrack()
-  itrack <- IdeogramTrack(genome = genome, chromosome = chr)
+  itrack <- IdeogramTrack(genome = genome, chromosome = chr, bands = UCSC_cytoBand )
   
   # merge track lists
   track_list <- c(list("IdeogramTrack" = itrack, 
@@ -131,12 +138,12 @@ plot_track_list <- function(merged_track_list, out_pdf_path){
 transcript_id <- opt$transcript_id
 # 1. Read GTF 
 gtf <- rtracklayer::import(opt$gtf)
-# 2. Generate transcript GTF
+# 2. Read cytoband information from UCSC, required to generate the chromosome Ideogram without connection to the UCSC server
+cytoBand <- read.table(opt$cytoBand, header = T, sep = "\t") 
+# 3. Generate transcript GTF
 transcript_model <- gtf_processing(gtf = gtf, transcript_id = transcript_id)
-# 3. Generate Transcript Track
-transcript_track_list <-  generate_transcript_track(transcriptModel = transcript_model, genome = "hg38", transcript_id =  unique(transcript_model$symbol))
-
-# plotTracks(transcript_track_list)
+# 4. Generate Transcript Track
+transcript_track_list <-  generate_transcript_track(transcriptModel = transcript_model, genome = "hg38", transcript_id =  unique(transcript_model$symbol), UCSC_cytoBand = cytoBand)
 
 # 4. Read PFAM alignment genomic coordinates 
 # TODO: Find a way to map protein coordinates to genomic coordinates with GTF
@@ -147,7 +154,7 @@ pfam_model <- coerce.pfam.df.to.gviz.format(pfam.genomic.coord)
 # If NOT EMPTY PFAM alignment: 
 if(!(all(is.na(pfam_model[["start"]])))){
   # 6. Generate PFAM TrackList
-  pfam_track_list <- generate_transcript_track(transcriptModel = pfam_model, genome = "hg38", transcript_id = unique(pfam_model$symbol))
+  pfam_track_list <- generate_transcript_track(transcriptModel = pfam_model, genome = "hg38", transcript_id = unique(pfam_model$symbol), UCSC_cytoBand = cytoBand)
   # 7. Merge Transcript and PFAM Tracks
   merged_track_list <- merge_track_lists(transcript_track_list, pfam_track_list)
   # 8. Save TrackList file
