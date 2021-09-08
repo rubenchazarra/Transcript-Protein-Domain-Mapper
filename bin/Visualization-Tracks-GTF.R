@@ -147,7 +147,7 @@ transcript_track_list <-  generate_transcript_track(transcriptModel = transcript
 
 # 4. Read PFAM alignment genomic coordinates 
 # TODO: Find a way to map protein coordinates to genomic coordinates with GTF
-pfam.genomic.coord <- read.table(opt$pfam_genomic_coord, header = T, row.names = 1)
+pfam.genomic.coord <- read.table(opt$pfam_genomic_coord, header = T)
 # 5. Coere PFAM df to required visualization format
 pfam_model <- coerce.pfam.df.to.gviz.format(pfam.genomic.coord)
 

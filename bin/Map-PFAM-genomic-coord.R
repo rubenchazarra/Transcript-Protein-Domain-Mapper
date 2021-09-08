@@ -47,8 +47,10 @@ create.iranges.pfam <- function(pfam_alignment, protein_id){
   ## Create IRanges object from PFAM alignment data
   pfam.al.start <- as.numeric(pfam_alignment[["alignment.from"]])
   pfam.al.stop <- as.numeric(pfam_alignment[["alignment.to"]])
+  n.alignments <- length(pfam.al.start)
+  protein_names <- rep(protein_id, times = n.alignments)
   # Create IRanges object
-  ir.prot <- IRanges(start = pfam.al.start, end = pfam.al.stop, names = protein_id)
+  ir.prot <- IRanges(start = pfam.al.start, end = pfam.al.stop, names = protein_names)
   return(ir.prot)
 }
 
@@ -60,15 +62,33 @@ extract.prot.genomic.coord.iranges <- function(iranges_prot, edbx){
 
 create.empty.iranges.pfam <- function(transcript_id){
   ## Create empty Iranges-like data frame for empty PFAM alignment outputs
-  table.names <- c("PFAM.alignment.ID", "Transcript.ID", "seqnames", "start", "end", "width", "strand", "protein_id", 
-                   "tx_id", "exon_id",  "exon_rank",  "cds_ok",  "protein_start",  "protein_end" )
+  table.names <- c("PFAM.Alignment.ID",
+                   "Transcript.ID", 
+                   
+                   "PFAM.Domain",
+                   "PFAM.Domain.Description",
+                   
+                   "seqnames", 
+                   "start",
+                   "end", 
+                   "width", 
+                   "strand", 
+                   "protein_id", 
+                   "tx_id", 
+                   "exon_id", 
+                   "exon_rank",  
+                   "cds_ok",  
+                   "protein_start",  
+                   "protein_end" )
+  
   empty.align <- rep(c(NA), times = length(table.names))
   names(empty.align) <- table.names
   
   # Fill in the fields we can ('PFAM.alignment.ID', 'Transcript.ID', 'tx_id')
   ## TODO: fetch chromosome number from 'transcript_id'
-  empty.align[["PFAM.alignment.ID"]] = paste0(transcript_id, "-NA", "-from-NA-to-NA-n_domain-0")
+  empty.align[["PFAM.Alignment.ID"]] = paste0(transcript_id, "-NA", "-from-NA-to-NA-n_domain-0")
   empty.align[["Transcript.ID"]] = transcript_id
+  
   empty.align[["tx_id"]] = transcript_id
   empty.pfam.df = data.frame(t(empty.align))
   return(empty.pfam.df)
@@ -89,46 +109,18 @@ extract.genomic.coord.pfam.alignment <- function(pfam_alignment, protein_id, edb
   prot.genome.coord.df <- lapply(prot.genome.coord, as.data.frame)[[1]]
   ## 4. Add alignment and transcript ID
   n.exons <- nrow(prot.genome.coord.df)
-  pfam.alignment.id.df <-data.frame(
-    "PFAM.alignment.ID" = rep(pfam.alignment.id, times = n.exons), 
-    "Transcript.ID" = rep(pfam_alignment[["transcript.id"]], times = n.exons))
+  
+  pfam.alignment.id.df <- data.frame(
+    "PFAM.Alignment.ID" = rep(pfam.alignment.id, times = n.exons), 
+    "Transcript.ID" = rep(pfam_alignment[["transcript.id"]], times = n.exons), 
+    "PFAM.Domain" = rep(pfam_alignment[["pfam.name"]], times = n.exons), 
+    "PFAM.Domain.Description" = rep(pfam_alignment[["target.description"]], times = n.exons)
+    )
   ### Cbind pfam.alignment ID
   prot.genome.coord.df <- cbind(pfam.alignment.id.df, prot.genome.coord.df)
   
   return(prot.genome.coord.df)
 }
-
-#get.protein_id.from.transcript_id <- function(transcript_id, ensembl_mart){
-#  ## Retrieve Ensembl protein ID from Ensembl transcript ID
-#  ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl") # <-- Hard-coded
-#  prot.id <- getBM(attributes=c('ensembl_transcript_id','ensembl_peptide_id'),   
-#                   filters = c('ensembl_transcript_id'), 
-#                   values = transcript_id,
-#                   mart = ensembl, 
-#                   useCache = F)
-#  if(nrow(prot.id) == 0){
-#    protein_id <- "ENSP.Not.Available"
-#  }else{
-#    protein_id <- prot.id[["ensembl_peptide_id"]]
-#  }
-#  return(protein_id)
-#}
-
-#get.chr.from.transcript_id.biomaRt <- function(transcript_id, ensembl_mart){
-#  ## Retrieve Ensembl chromosome from Ensembl transcript ID
-#  ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl") # <-- Hard-coded
-#  chr <- getBM(attributes=c('chromosome_name'),   
-#                   filters = c('ensembl_transcript_id'), 
-#                   values = transcript_id,
-#                   mart = ensembl, 
-#                   useCache = F)
-#  if(nrow(chr) == 0){
-#    chr <- "Chr.Not.Available"
-#  }else{
-#    chr <- chr[["chromosome_name"]]
-#  }
-#  return(chr)
-#}
 
 gtf_processing <- function(gtf, transcript_id){
   ## Subset GTF and perform pertinent modifications for visualization
@@ -150,9 +142,6 @@ gtf_processing <- function(gtf, transcript_id){
 # 0. Params
 transcript_id <- opt$transcript_id
 
-# 1. Get protein ID from on transcript_id with Ensembl BiomaRt
-# suppressPackageStartupMessages(require(biomaRt))
-# protein_id <- get.protein_id.from.transcript_id(transcript_id = transcript_id)
 # 1. Read GTF 
 gtf <- rtracklayer::import(opt$gtf)
 # 2. Generate transcript GTF
@@ -187,7 +176,7 @@ if(all(pfam_alignment[["pfam.match"]] == T)){
 # 4. Add chromosome from transcript_id from transcript_GTF file
 genomic.coord.df[["seqnames"]] <- chr_name
 ## 5. Add Chr name to PFAM alignment ID
-genomic.coord.df[["PFAM.alignment.ID"]] = paste0(genomic.coord.df[["PFAM.alignment.ID"]], "-", genomic.coord.df[["seqnames"]])
+genomic.coord.df[["PFAM.Alignment.ID"]] = paste0(genomic.coord.df[["PFAM.Alignment.ID"]], "-", genomic.coord.df[["seqnames"]])
 
 # 6. Save 
-write.table(genomic.coord.df, file = opt$output_coord, quote = F, row.names = F, sep = "\t")
+write.table(genomic.coord.df, file = opt$output_coord, sep = "\t", quote = F)
