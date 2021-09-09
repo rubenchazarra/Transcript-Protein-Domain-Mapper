@@ -28,9 +28,9 @@ process get_CDS_and_Protein_local {
 	tag "get CDS $transcript_id Local"
 	
 	// TODO: FIX:  Sub-GTF files are saved in 1.CDS_fasta-Local due to the "else" // If indexing ".indexOf(".fasta")" both transcript and protein fasta are saved in the same dir.	
-	publishDir "${params.outdir}/${params.run_tag}/", mode: 'copy',
+	publishDir "${params.outdir}/${params.run_tag}/2.Protein_fasta-Local", mode: 'copy',
 	    saveAs: {filename ->
-	    	if (filename.indexOf(".protein.fasta") > 0) "2.Protein_fasta-Local/$filename"
+	    	if (filename.indexOf(".protein.fasta") > 0) "$filename"
 	    	else  "1.CDS_fasta-Local/$filename" 
 	    }
 	
@@ -62,9 +62,9 @@ process get_CDS_and_Protein_local {
 process query_PFAM_local {
 	tag "Query PFAM $transcript_id Local"
 	
-	publishDir "${params.outdir}/${params.run_tag}/", mode: 'copy',
+	publishDir "${params.outdir}/${params.run_tag}/3.PFAM_query-Local", mode: 'copy',
 	    saveAs: {filename ->
-	    	if (filename.indexOf(".txt") > 0) "3.PFAM_query-Local/$filename"
+	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
 	input:
@@ -88,9 +88,9 @@ process query_PFAM_local {
 process read_PFAM_local {
 	tag "Read PFAM $transcript_id Local"
 	
-	publishDir "${params.outdir}/${params.run_tag}/", mode: 'copy',
+	publishDir "${params.outdir}/${params.run_tag}/4.PFAM-output-CSV", mode: 'copy',
 	    saveAs: {filename ->
-	    	if (filename.indexOf(".txt") > 0) "4.PFAM-output-CSV/$filename"
+	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
 	input:
@@ -136,18 +136,18 @@ process merge_PFAM_output{
 
 // Extract PFAM alignment genomic coordinates
 process map_genomic_coord {
-	tag "Extract genomic coordinates $transcript_id"
+	tag "Genomic coordinates $transcript_id"
 	
-	publishDir "${params.outdir}/${params.run_tag}/", mode: 'copy',
+	publishDir "${params.outdir}/${params.run_tag}/5.Genomic-coord-PFAM", mode: 'copy',
 	    saveAs: {filename ->
-	    	if (filename.indexOf(".txt") > 0) "5.Genomic-coord-PFAM/$filename"
+	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
 	input:
 	set val(transcript_id), file(transcript_GTF_file), file(pfam_alignment) from ch_genomic_coord_PFAM	
 	
 	output:
-	set val(transcript_id), file(transcript_GTF_file), file("${transcript_id}-PFAM.genomic.coordinates.txt") into ch_merge_genomic_coord_PFAM, ch_visualization
+	set val(transcript_id), file(transcript_GTF_file), file("${transcript_id}-PFAM.genomic.coordinates.txt") into ch_merge_genomic_coord_PFAM, ch_visualization_transcript, ch_visualization_event 
 	
 	script:
 	"""
@@ -160,18 +160,19 @@ process map_genomic_coord {
 	"""
 	}
 
-// Visualize PFAM alignment
-process visualization {
+
+// Visualize Transcript Model + PFAM alignment
+process visualization_transcript {
 	tag "Visualize PFAM alignment $transcript_id"
 	
-	publishDir "${params.outdir}/${params.run_tag}/6.Visualization", mode: 'copy'
-	    //saveAs: {filename ->
-	    //	if (filename.indexOf(".rds") > 0) "6.Visualization/$filename"
-	    //	else if (filename.indexOf(".txt") > 0) "6.Visualization/$filename"
-	    //}
+	publishDir "${params.outdir}/${params.run_tag}/6.Visualization-Transcript", mode: 'copy',
+	    saveAs: {filename ->
+	    	if (filename.indexOf(".rds") > 0) "$filename"
+	    	else if (filename.indexOf(".txt") > 0) "$filename"
+	    }
 	
 	input:
-	set val(transcript_id), file(transcript_gtf_file), file(pfam_alignment) from ch_visualization
+	set val(transcript_id), file(transcript_gtf_file), file(pfam_alignment) from ch_visualization_transcript
 	
 	output:
 	file("*.rds")
@@ -180,7 +181,7 @@ process visualization {
 	script:
 	"""
        	module load R 
-	${baseDir}/bin/Visualization-Tracks-GTF.R \
+	${baseDir}/bin/Visualization-Transcript.R \
 		--transcript_id  ${transcript_id} \
 		--pfam_genomic_coord ${pfam_alignment} \
 		--gtf ${transcript_gtf_file} \
@@ -190,13 +191,59 @@ process visualization {
 	"""
 	}
 
+
+// Visualization of Alternative Splicing Event
+
+// Aggregation Visualizaiton Ch (from CSV). First element is Event_ID, next are Transcript_IDs participating in the event
+ch_viz_aggr = Channel.fromPath(params.visualization.aggregation_csv).splitCsv(header: false).map { tuple ( it[0], it[1..-1]) }
+
+// Duplicate viz_ch to select GTF files and PFAM outputs independently
+ch_visualization_event.into { ch_viz_event_gtf; ch_viz_event_pfam }
+
+// GTF Channel // Collect GTF Files
+ch_viz_gtf = ch_viz_event_gtf.map{ it[1] }.collect()
+
+// PFAM Gen-Coord Channel // Collect PFAM Genomic Coordinate Files 
+ch_viz_pfam = ch_viz_event_pfam.map{ it[2] }.collect()
+
+// Visualize AS Event
+process visualization_event {
+	tag "Visualization AS Event $event_id"
+	
+	publishDir "${params.outdir}/${params.run_tag}/6.Visualization-Events", mode: 'copy',
+	    saveAs: {filename ->
+	    	if (filename.indexOf(".rds") > 0) "$filename"
+	    	else if (filename.indexOf(".pdf") > 0) "$filename"
+	    }
+	
+	input:
+	tuple val(event_id), val(transcript_ids) from ch_viz_aggr 
+	file ('gtf_path/*') from ch_viz_gtf	
+	file ('pfam_path/*') from ch_viz_pfam	
+	
+	output:
+	file("*.rds")
+	file("*.pdf")
+	
+	script:
+	"""
+       	module load R 
+	${baseDir}/bin/Visualization-AS-Event.R \
+		--transcript_ids  "${transcript_ids}" \
+		--event_id "${event_id}" \
+		--pfam_path 'pfam_path/' \
+		--gtf_path 'gtf_path/' \
+		--cytoBand ${params.visualization.cytoBand_table} \
+		--viz_track_list  "${event_id}-Visualization-Gviz-Trackplot.rds" \
+		--viz_track_plot  "${event_id}-Visualization-Gviz-Trackplot.pdf" \
+	"""
+	}
+
+
 //// Merge Genomic coordinates output
 process merge_genomic_coord_PFAM {
 	tag "Merge PFAM outputs" 
 	publishDir "${params.outdir}/${params.run_tag}/5.Merged-Genomic-coord-PFAM/",  mode: 'copy'
-	// maxForks 8	
-	// memory = { 6.GB + 2.GB * (task.attempt) }		
-	
 	
 	input:
 	file("genomic-coord-pfam/") from ch_merge_genomic_coord_PFAM.collect()
