@@ -190,7 +190,9 @@ plot.tracks <- function(track.list, event.id, out.pdf.path){
 ## Execute
 
 # 1) Transcript IDs of the AS event to represent
-transcript_ids <-  gsub(opt$transcript_ids, pattern = " ", replacement = "") # remove blank spaces 
+transcript_ids <-  as.character(opt$transcript_ids)
+replace_chars <- c("[][]", " ") # We want to replace the square brackets, because nextflow inputs transcript_ids tuple as a value --> "[tr_id_1, tr_id_2]"
+for (char in replace_chars){ transcript_ids <-  gsub(transcript_ids, pattern = char, replacement = "") }
 transcript_ids <- unlist(strsplit(transcript_ids , ","))# split by comma
 
 # 2) Read PFAM File List
@@ -199,6 +201,9 @@ pfam.list <- create.file.path.list(file.path = opt$pfam_path,
                                    file.patt = ".txt", 
                                    transcript_ids = transcript_ids)
 pfam.list <- lapply(pfam.list, function(path) read.table(path, header = T))
+## Filter for Transcripts with NO PFAM Hit
+pfam.hits <- unlist(lapply(pfam.list, function(pfam_df) all(!is.na(pfam_df[["PFAM.Domain"]]))))
+pfam.list <- pfam.list[pfam.hits]
 
 ## 3) Read and process transcript-GTF File List
 gtf.list <- create.file.path.list(file.path = opt$gtf_path,
