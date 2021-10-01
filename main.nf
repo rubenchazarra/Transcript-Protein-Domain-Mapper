@@ -28,9 +28,9 @@ process get_CDS_and_Protein_local {
 	tag "get CDS $transcript_id Local"
 	
 	// TODO: FIX:  Sub-GTF files are saved in 1.CDS_fasta-Local due to the "else" // If indexing ".indexOf(".fasta")" both transcript and protein fasta are saved in the same dir.	
-	publishDir "${params.outdir}/${params.run_tag}/2.Protein_fasta-Local", mode: 'copy',
+	publishDir "${params.outdir}/${params.run_tag}/", mode: 'copy',
 	    saveAs: {filename ->
-	    	if (filename.indexOf(".protein.fasta") > 0) "$filename"
+	    	if (filename.indexOf(".protein.fasta") > 0) "2.Protein_fasta-Local/$filename"
 	    	else  "1.CDS_fasta-Local/$filename" 
 	    }
 	
@@ -168,7 +168,7 @@ process visualization_transcript {
 	publishDir "${params.outdir}/${params.run_tag}/6.Visualization-Transcript", mode: 'copy',
 	    saveAs: {filename ->
 	    	if (filename.indexOf(".rds") > 0) "$filename"
-	    	else if (filename.indexOf(".txt") > 0) "$filename"
+	    	else if (filename.indexOf(".pdf") > 0) "$filename"
 	    }
 	
 	input:
@@ -195,7 +195,7 @@ process visualization_transcript {
 // Visualization of Alternative Splicing Event
 
 // Aggregation Visualizaiton Ch (from CSV). First element is Event_ID, next are Transcript_IDs participating in the event
-ch_viz_aggr = Channel.fromPath(params.visualization.aggregation_csv).splitCsv(header: false).map { tuple ( it[0], it[1..-1]) }
+ch_viz_aggr = Channel.fromPath(params.visualization.aggregation_csv).splitCsv(header: false).map { tuple ( it[0], it[1], it[2..-1]) }
 
 // Duplicate viz_ch to select GTF files and PFAM outputs independently
 ch_visualization_event.into { ch_viz_event_gtf; ch_viz_event_pfam }
@@ -217,7 +217,7 @@ process visualization_event {
 	    }
 	
 	input:
-	tuple val(event_id), val(transcript_ids) from ch_viz_aggr 
+	tuple val(event_id), val(gene_id), val(transcript_ids) from ch_viz_aggr 
 	file ('gtf_path/*') from ch_viz_gtf	
 	file ('pfam_path/*') from ch_viz_pfam	
 	
@@ -231,11 +231,12 @@ process visualization_event {
 	${baseDir}/bin/Visualization-AS-Event.R \
 		--transcript_ids  "${transcript_ids}" \
 		--event_id "${event_id}" \
-		--pfam_path 'pfam_path/' \
-		--gtf_path 'gtf_path/' \
+		--gene_id "${gene_id}" \
+		--pfam_path "pfam_path/" \
+		--gtf_path "gtf_path" \
 		--cytoBand ${params.visualization.cytoBand_table} \
-		--viz_track_list  "${event_id}-Visualization-Gviz-Trackplot.rds" \
-		--viz_track_plot  "${event_id}-Visualization-Gviz-Trackplot.pdf" \
+		--viz_track_list  "${gene_id}-${event_id}-Visualization-Gviz-Trackplot.rds" \
+		--viz_track_plot  "${gene_id}-${event_id}-Visualization-Gviz-Trackplot.pdf" \
 	"""
 	}
 

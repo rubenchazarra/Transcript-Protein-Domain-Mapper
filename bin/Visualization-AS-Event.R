@@ -4,7 +4,7 @@
 # The Goal is to represent the Alternative Splicing Event. The transcripts involved in each AS event are defined in an external Aggregation CSV
 # TODO: Extract transcript genomic coordinates from GTF and not from EnsmblDB for consistency
 
-suppressPackageStartupMessages(require(optparse))
+suppressPackageStartupMessages(require("optparse"))
 
 option_list = list(
   make_option(
@@ -22,6 +22,13 @@ option_list = list(
     help = 'The ID of the AS Event to be represented. This will appear in the PDF Plot Title.'
   ),
   make_option(
+    c("-g", "--gene_id"),
+    action = "store",
+    default = NA,
+    type = 'character',
+    help = 'Gene ID (in HGNC Format) of the Alternative Splicing Event'
+  ),
+  make_option(
     c("-p", "--pfam_path"),
     action = "store",
     default = NA,
@@ -29,7 +36,7 @@ option_list = list(
     help = 'Path to the directory where the PFAM alignments of the differents Transcripts to represent are located.'
   ), 
   make_option(
-    c("-g", "--gtf_path"),
+    c("-t", "--gtf_path"),
     action = "store",
     default = NA,
     type = 'character',
@@ -72,7 +79,7 @@ create.file.path.list <- function(file.path, file.patt, transcript_ids){
   list.order <- lapply(transcript_ids, function(tr) grep(tr, file.vec))
   # Order list to match: TranscriptID - file
   path.list <- as.list(file.vec[unlist(list.order)])
-  names(path.list) <- transcript_ids  # TODO: PROBLEM HERE
+  names(path.list) <- transcript_ids
   return(path.list)
 }
 
@@ -180,17 +187,20 @@ integrate.tracks <- function(itrack, gtrack, transcript.track.list, pfam.track.l
 }
 
 ## 8. Plot track list
-plot.tracks <- function(track.list, event.id, out.pdf.path){
+plot.tracks <- function(track.list, plot.title, out.pdf.path){
   ## Save the Track Plot to PDF file in 'out_pdf_path'
   pdf(out.pdf.path)
-  Gviz::plotTracks(main = event.id, track.list)
+  Gviz::plotTracks(track.list, 
+                   main = plot.title, 
+                   cex.main = 1 
+                   )
   dev.off()
 }
 
 ## Execute
 
 # 1) Transcript IDs of the AS event to represent
-transcript_ids <-  as.character(opt$transcript_ids)
+transcript_ids <-  opt$transcript_ids
 replace_chars <- c("[][]", " ") # We want to replace the square brackets, because nextflow inputs transcript_ids tuple as a value --> "[tr_id_1, tr_id_2]"
 for (char in replace_chars){ transcript_ids <-  gsub(transcript_ids, pattern = char, replacement = "") }
 transcript_ids <- unlist(strsplit(transcript_ids , ","))# split by comma
@@ -238,11 +248,8 @@ chr <- extract.chr.num(gtf.list = gtf.list)
 cytoBand <- read.table(opt$cytoBand, header = T, sep = "\t") # 2. Read cytoband information from UCSC, required to generate the chromosome Ideogram without connection to the UCSC server
 itrack <- IdeogramTrack(genome = gen, chromosome = chr, bands = cytoBand)
 
-
-
 # 5.3) Transcript Tracks
-transcript.track.list <- lapply(names(gtf.processed.list), function(tr_name) generate.transcript.track(coord_df = gtf.processed.list[[tr_name]],
-                                                                                                       id_name = "transcript_id",
+transcript.track.list <- lapply(names(gtf.processed.list), function(tr_name) generate.transcript.track(coord_df = gtf.processed.list[[tr_name]],                                                                                                       id_name = "transcript_id",
                                                                                                        gen = gen, chr = chr,
                                                                                                        color = "palegreen3"))
 ## Add names
@@ -266,4 +273,9 @@ track.list <- integrate.tracks(itrack = itrack,
 saveRDS(track.list, file = opt$viz_track_list)
 
 # 8) Generate and Save Track Plot
-plot.tracks(track.list = track.list, event.id = opt$event_id, out.pdf.path = opt$viz_track_plot)
+gene.id <- opt$gene_id
+event.id <- opt$event_id
+plot.tracks(track.list = track.list, 
+            plot.title = paste0(gene.id, "-", event.id), 
+            out.pdf.path = opt$viz_track_plot)
+

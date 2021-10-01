@@ -1,8 +1,13 @@
 #!/bin/sh
 
 #SBATCH --partition=interactive  # Partition to submit to
-#SBATCH --workdir=/home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/
 #SBATCH --qos=debug
+#SBATCH --nodes=1                    # Run all processes on a single node	
+#SBATCH --ntasks=2                  # Run a single task		
+#SBATCH --cpus-per-task=4            # Number of CPU cores per task
+#SBATCH --mem=32gb 
+#SBATCH --output=logs/slurm_%j.out
+#SBATCH --error=logs/slurm_%j.err
 
 source_dir="$(pwd)"
 report_dir="${source_dir}/reports"
