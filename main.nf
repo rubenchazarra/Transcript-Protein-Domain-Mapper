@@ -17,7 +17,7 @@ ch_genome_fasta = Channel.fromPath("${genome_fasta}").ifEmpty { exit 1, "Genome 
 
 
 // Read transcript ID list obtained from previous process 
-ch_transcriptID = Channel.fromPath(params.transcript_list).flatMap{ it.readLines() }
+ch_transcriptID = Channel.fromPath(params.transcript_list).flatMap{ it.readLines() }.unique()
 
 
 // Combine each transcript ID with the genome_fasta and GTF_file
@@ -45,7 +45,6 @@ process get_CDS_and_Protein_local {
 	
 	output:
 	set val(transcript_id), file("${transcript_id}.gtf"), file("${transcript_id}.protein.fasta") into ch_query_PFAM_local	
-	set val(transcript_id), file("${transcript_id}.fasta") 
 	
 	script:
 	"""
@@ -72,6 +71,7 @@ process query_PFAM_local {
 	
 	output:
 	set val(transcript_id), file(transcript_GTF_file), file("${transcript_id}.pfam.out.txt") into ch_PFAM_output_local	
+	set val(transcript_id), file(protein_fasta) into ch_protein_fasta 
 	
 	script:
 	def local_PFAM_DB = params.query_PFAM.local_PFAM_DB	
@@ -97,7 +97,7 @@ process read_PFAM_local {
 	set val(transcript_id), file(transcript_GTF_file), file(pfam_alignment) from ch_PFAM_output_local	
 	
 	output:
-	set val(transcript_id), file(transcript_GTF_file), file("${transcript_id}-pfam.alignment.txt") into ch_merge_PFAM_output
+	set val(transcript_id), file(transcript_GTF_file), file("${transcript_id}-pfam.alignment.txt") into ch_merge_PFAM_output, ch_genomic_coord_PFAM, ch_genomic_coord_PFAM_GTF
 	
 	script:
 	"""
@@ -109,8 +109,8 @@ process read_PFAM_local {
 	"""
 	}
 
-// Channel duplication 
-ch_merge_PFAM_output.into{ ch_genomic_coord_PFAM; ch_merge_PFAM_alignments }
+// Select only PFAM alignments from Channel
+ch_merge_PFAM_alignments = ch_merge_PFAM_output.map { it -> it[2] }.collect()
 
 //// Merge PFAM output
 process merge_PFAM_output{
@@ -134,7 +134,7 @@ process merge_PFAM_output{
 	"""
 }
 
-// Extract PFAM alignment genomic coordinates
+// Extract PFAM alignment genomic coordinates [EnsemblDB]
 process map_genomic_coord {
 	tag "Genomic coordinates $transcript_id"
 	
@@ -152,7 +152,7 @@ process map_genomic_coord {
 	script:
 	"""
        	module load R 
-	${baseDir}/bin/Map-PFAM-genomic-coord.R \
+	${baseDir}/bin/Map-PFAM-genomic-coord-EnsemblDB.R \
 		--pfam_alignment ${pfam_alignment} \
 		--gtf ${transcript_GTF_file} \
 		--transcript_id  ${transcript_id} \
@@ -160,6 +160,35 @@ process map_genomic_coord {
 	"""
 	}
 
+// Add protein fasta to channel
+ch_genomic_coord_PFAM_protein = ch_genomic_coord_PFAM_GTF.combine(ch_protein_fasta, by: 0) 
+
+// Extract PFAM alignment genomic coordinates [GTF]
+process map_genomic_coord_gtf {
+	tag "Genomic coords GTF: $transcript_id"
+	
+	publishDir "${params.outdir}/${params.run_tag}/5.Genomic-coord-PFAM-GTF", mode: 'copy',
+	    saveAs: {filename ->
+	    	if (filename.indexOf(".txt") > 0) "$filename"
+	    }
+	
+	input:
+	set val(transcript_id), file(transcript_GTF_file), file(pfam_alignment), file(protein_fasta) from ch_genomic_coord_PFAM_protein
+	
+	output:
+	file("${transcript_id}-PFAM.genomic.coordinates-GTF.txt")
+	
+	script:
+	"""
+       	module load R
+	${baseDir}/bin/Map-PFAM-genomic-coord-GTF.R \
+		--pfam_alignment ${pfam_alignment} \
+		--gtf ${transcript_GTF_file} \
+		--transcript_id  ${transcript_id} \
+		--protein_fasta  ${protein_fasta} \
+		--output_coord  "${transcript_id}-PFAM.genomic.coordinates-GTF.txt" \
+	"""
+	}
 
 // Visualize Transcript Model + PFAM alignment
 process visualization_transcript {

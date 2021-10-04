@@ -295,7 +295,7 @@ integrate.al.pfam.with.coords <- function(al.pfam, pfam_gcords){
   al.pfam.id.df <- data.frame("PFAM.alignment.ID" = rep(al.pfam.id, times = n.exons), 
                               "Transcript.ID" = rep(al.pfam[["transcript.id"]], times = n.exons), 
                               "PFAM.Domain" = rep(al.pfam[["pfam.name"]], times = n.exons), 
-                              "PFAM.Domain.Description" = rep(al.pfam[["pfam.description"]], times = n.exons)
+                              "PFAM.Domain.Description" = rep(al.pfam[["target.description"]], times = n.exons)
   )
   # 5. Merge 2 dfs
   cbind(al.pfam.id.df, pfam_gcords)
