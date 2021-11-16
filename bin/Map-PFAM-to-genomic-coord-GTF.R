@@ -45,9 +45,6 @@ option_list = list(
 
 opt <- parse_args(OptionParser(option_list=option_list))
 
-suppressPackageStartupMessages(require(ensembldb))
-suppressPackageStartupMessages(require(rtracklayer))
-
 ## Functions ##
 
 # 1) Read fasta file protein sequence to variable
@@ -69,8 +66,8 @@ create.iranges.pfam <- function(pfam_alignment, protein_id){
   if (missing(pfam_alignment)) stop("Argument 'pfam_alignment' is required.")
   if (missing(protein_id)) stop("Argument 'protein_id' is required.")
   
-  pfam.al.start <- as.numeric(pfam_alignment[["alignment.from"]])
-  pfam.al.stop <- as.numeric(pfam_alignment[["alignment.to"]])
+  pfam.al.start <- as.numeric(pfam_alignment[["ali_from"]])
+  pfam.al.stop <- as.numeric(pfam_alignment[["ali_to"]])
   n.alignments <- length(pfam.al.start)
   protein_names <- rep(protein_id, times = n.alignments)
   # Create IRanges object
@@ -286,16 +283,15 @@ integrate.al.pfam.with.coords <- function(al.pfam, pfam_gcords){
   # 1. Select chrN
   chrN <- unique(seqnames(pfam_gcords))
   # 2. Create PFAM alignment identifier string
-  al.pfam.id <- paste0(al.pfam[["transcript.id"]], "-",  al.pfam[["pfam.name"]],
-                       "-from-", as.numeric(al.pfam[["alignment.from"]]),
-                       "-to-", as.numeric(al.pfam[["alignment.to"]]), "-", chrN) 
+  al.pfam.id <- paste0(al.pfam[["query_name"]], "-",  al.pfam[["domain_name"]],
+                       "-from-", as.numeric(al.pfam[["ali_from"]]),
+                       "-to-", as.numeric(al.pfam[["ali_to"]]), "-", chrN) 
   # 3. Number of exons in pfam_gcords
   n.exons <- pfam_gcords@seqnames@lengths 
   # 4. PFAM Metadata DF
-  al.pfam.id.df <- data.frame("PFAM.alignment.ID" = rep(al.pfam.id, times = n.exons), 
-                              "Transcript.ID" = rep(al.pfam[["transcript.id"]], times = n.exons), 
-                              "PFAM.Domain" = rep(al.pfam[["pfam.name"]], times = n.exons), 
-                              "PFAM.Domain.Description" = rep(al.pfam[["target.description"]], times = n.exons)
+  al.pfam.id.df <- data.frame("pfam_alignment_id" = rep(al.pfam.id, times = n.exons), 
+                              "pfam_domain" = rep(al.pfam[["domain_name"]], times = n.exons), 
+                              "pfam_domain_description" = rep(al.pfam[["description"]], times = n.exons)
   )
   # 5. Merge 2 dfs
   cbind(al.pfam.id.df, pfam_gcords)
@@ -304,11 +300,9 @@ integrate.al.pfam.with.coords <- function(al.pfam, pfam_gcords){
 # 9) Create empty PFAM data frame
 create.empty.iranges.pfam <- function(transcript_id, chrN) {
   ## Create empty Iranges-like data frame for empty PFAM alignment outputs
-  table.names <- c("PFAM.Alignment.ID",
-                   "Transcript.ID", 
-                   
-                   "PFAM.Domain",
-                   "PFAM.Domain.Description",
+  table.names <- c("pfam_alignment_id", 
+                   "pfam_domain", 
+                   "pfam_domain_description", 
                    
                    "seqnames", 
                    "start",
@@ -316,9 +310,9 @@ create.empty.iranges.pfam <- function(transcript_id, chrN) {
                    "width", 
                    "strand", 
                    "protein_id", 
-                   "tx_id", 
+                   "transcript_id", 
                    "exon_id", 
-                   "exon_rank",  
+                   "exon_number",  
                    "cds_ok",  
                    "protein_start",  
                    "protein_end" )
@@ -327,18 +321,18 @@ create.empty.iranges.pfam <- function(transcript_id, chrN) {
   names(empty.align) <- table.names
   
   # Fill in the fields we can ('PFAM.alignment.ID', 'Transcript.ID', 'seqnames', 'tx_id')
-  empty.align[["PFAM.Alignment.ID"]] = paste0(transcript_id, "-NA", "-from-NA-to-NA-", chrN)
-  empty.align[["Transcript.ID"]] = transcript_id
+  empty.align[["pfam_alignment_id"]] = paste0(transcript_id, "-NA", "-from-NA-to-NA-", chrN)
   empty.align[["seqnames"]] = chrN
+  empty.align[["transcript_id"]] = transcript_id
   
-  empty.align[["tx_id"]] = transcript_id
   empty.pfam.df = data.frame(t(empty.align))
   return(empty.pfam.df)
 }
 
 
 ### Run
-suppressPackageStartupMessages(require(ensembldb))
+suppressPackageStartupMessages(require(ensembldb)) # Note: using some functionalities of ensembldb, but not the EnsDb.Hsapiens.v86 annotation package
+suppressPackageStartupMessages(require(rtracklayer))
 
 # 0. Params
 transcript_id <- opt$transcript_id
@@ -353,23 +347,25 @@ protein_id <- unlist(strsplit(unique(gtf$protein_id), "[.]"))[1] # This is to re
 prot_seq <- read_fasta_prot(file.path = opt$protein_fasta)
 
 ## 1.3. Pfam Alignment
-al.pfam <- read.table(opt$pfam_alignment, header = T)
-ir.pfam <-  create.iranges.pfam(al.pfam, protein_id) # create IRanges object from PFAM alignment
+al.pfam <- read.table(opt$pfam_alignment, header = T, sep = "\t", quote="\"" ) # Note: this quoting symbol is to avoid quotes in string of pfam alignment description (5' for instance) to be understood as quoting character
 
 # 2 Protein --> Genomic Coordinates
 ## Condition: if PFAM alignment contains some output
-if(all(al.pfam[["pfam.match"]] == T)){
-    # 1. Convert protein relative (PFAM alignment) coordinates to genomic
+if(all(al.pfam[["pfam_match"]] == TRUE)){
+    # 1. Create IRanges object 
+    ir.pfam <-  create.iranges.pfam(al.pfam, protein_id) # create IRanges object from PFAM alignment
+    # 2. Convert protein relative (PFAM alignment) coordinates to genomic
     pfam_gcords <- protein_to_genome(ir.pfam = ir.pfam, gtf = gtf, prot_seq = prot_seq, transcript_id) # this is a list
-    # 2. Split PFAM alignment to list
+    # 3. Split PFAM alignment to list
     al.pfam.list <- split(al.pfam, seq(nrow(al.pfam))) # each row is an element of the list now
-    # 3. Integrate PFAM domain data with PFAM alignment genomic coordinates
-    pfam.coords.list <- mapply(function(al.pfam, pfam_gcords) integrate.al.pfam.with.coords(al.pfam, pfam_gcords), al.pfam.list, pfam_gcords, SIMPLIFY = F)
-    # 4. Merge dfs to single df
+    # 4. Integrate PFAM domain data with PFAM alignment genomic coordinates
+    pfam.coords.list <- mapply(function(al.pfam.list, pfam_gcords) integrate.al.pfam.with.coords(al.pfam, pfam_gcords), al.pfam.list, pfam_gcords, SIMPLIFY = F)
+    # 5. Merge dfs to single df
     pfam.coords.df <- Reduce(rbind, pfam.coords.list)
-  
+    # 6. Order df bu 'exon_number'
+    pfam.coords.df <-  pfam.coords.df[ order(as.numeric(pfam.coords.df$exon_number, decreasing = F)), ]
   # If PFAM alignment is empty
-  } else{
+  } else if (all(al.pfam[["pfam_match"]] == FALSE)) {
     chrN <- unique(seqnames(gtf))
     # Create empty dataframe if no PFAM hit was retrieved
     pfam.coords.df <- create.empty.iranges.pfam(transcript_id = transcript_id, chrN = chrN)

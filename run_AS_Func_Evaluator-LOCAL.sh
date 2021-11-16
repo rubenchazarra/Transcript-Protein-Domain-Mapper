@@ -16,4 +16,4 @@ export NXF_OPTS="-Xms500M -Xmx2G"
         -with-timeline "${report_dir}/timeline.html" \
 	-with-dag "${report_dir}/flowchart.png" \
 	-profile local \
-	-resume	
+	#-resume	

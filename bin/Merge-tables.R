@@ -7,14 +7,14 @@ suppressPackageStartupMessages(library("optparse"))
 
 option_list = list(
   make_option(
-    c("-i", "--input_pfam"),
+    c("-i", "--input_tables"),
     action = "store",
     default = NA,
     type = 'character',
     help = 'Path directory containing all the PFAM alignment csv files.'
   ),
   make_option(
-    c("-o", "--output_pfam_df"),
+    c("-o", "--output_df"),
     action = "store",
     default = NA,
     type = 'character',
@@ -26,9 +26,11 @@ option_list = list(
 opt <- parse_args(OptionParser(option_list=option_list))
 
 # 1. List files in dir
-files = list.files(opt$input_pfam, pattern = ".txt", full.names = T)
-file.list = lapply(files, read.table, sep = "\t", header = T)
+files = list.files(opt$input_tables, pattern = ".txt", full.names = T)
+file.list = lapply(files, read.table, header = T, sep = "\t", quote = "\"")
 # 2. Merge files to single df
-pfam.df = Reduce(rbind, file.list)
+df = Reduce(rbind, file.list)
+## Add rownames (avoid duplicates)
+rownames(df) = c(1:nrow(df))
 # 3. Save file
-write.table(pfam.df, file = opt$output_pfam_df, sep = "\t", quote = F, row.names = T)
+write.table(df, file = opt$output_df, sep = "\t", quote = F, row.names = T)

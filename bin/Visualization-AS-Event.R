@@ -161,16 +161,16 @@ coerce.pfam.df.to.gviz.format <- function(pfam.genomic.coord){
                   "end" = pfam.genomic.coord$end, 
                   "width" = pfam.genomic.coord$width, 
                   "strand" = pfam.genomic.coord$strand, 
-                  "transcript" = pfam.genomic.coord$tx_id,
+                  "transcript" = pfam.genomic.coord$transcript_id,
                   "exon" = pfam.genomic.coord$exon_id,
                   "protein" = pfam.genomic.coord$protein_id,
-                  "symbol" = paste(pfam.genomic.coord$transcript, direction),
-                  "PFAM.Alignment.ID" = paste(pfam.genomic.coord$PFAM.Alignment.ID, direction), 
-                  "PFAM.Domain" = pfam.genomic.coord$PFAM.Domain, 
-                  "PFAM.Domain.Description" = pfam.genomic.coord$PFAM.Domain.Description
+                  "symbol" = paste(pfam.genomic.coord$transcript_id, direction),
+                  "pfam_alignment_id" = paste(pfam.genomic.coord$pfam_alignment_id, direction), 
+                  "pfam_domain" = pfam.genomic.coord$pfam_domain, 
+                  "pfam_domain_description" = pfam.genomic.coord$pfam_domain_description
   )
   # Convert alignment ID to character  Required for visualization
-  df[["symbol"]] = as.character(df[["PFAM.Alignment.ID"]])
+  df[["symbol"]] = as.character(df[["pfam_alignment_id"]])
   return(df)
 }
 
@@ -210,9 +210,9 @@ transcript_ids <- unlist(strsplit(transcript_ids , ","))# split by comma
 pfam.list <- create.file.path.list(file.path = opt$pfam_path, 
                                    file.patt = ".txt", 
                                    transcript_ids = transcript_ids)
-pfam.list <- lapply(pfam.list, function(path) read.table(path, header = T))
+pfam.list <- lapply(pfam.list, function(path) read.table(path, header = T, sep = "\t"))
 ## Filter for Transcripts with NO PFAM Hit
-pfam.hits <- unlist(lapply(pfam.list, function(pfam_df) all(!is.na(pfam_df[["PFAM.Domain"]]))))
+pfam.hits <- unlist(lapply(pfam.list, function(pfam_df) all(!is.na(pfam_df[["pfam_domain"]]))))
 pfam.list <- pfam.list[pfam.hits]
 
 ## 3) Read and process transcript-GTF File List
@@ -220,11 +220,11 @@ gtf.list <- create.file.path.list(file.path = opt$gtf_path,
                                   file.patt = ".gtf",
                                   transcript_ids = transcript_ids)
 gtf.list <- lapply(gtf.list, function(path) data.frame(rtracklayer::import(path)))
-
+gtf.list <- gtf.list[pfam.hits]
 # 4) Process Files
 ## PFAM File List
 ### Coerce PFAM Df to GViz Format
-pfam.gviz.list <- lapply(pfam.list, function(pfam_df)  coerce.pfam.df.to.gviz.format(pfam.genomic.coord = pfam_df))
+pfam.gviz.list <- lapply(pfam.list, function(pfam_df) coerce.pfam.df.to.gviz.format(pfam.genomic.coord = pfam_df))
 
 ## GTF File List
 gtf.processed.list <- lapply(names(gtf.list), function(tr_name) gtf_processing(gtf = gtf.list[[tr_name]], transcript_id = tr_name))

@@ -2,12 +2,10 @@
 
 #SBATCH --partition=interactive  # Partition to submit to
 #SBATCH --qos=debug
-#SBATCH --nodes=1                    # Run all processes on a single node	
-#SBATCH --ntasks=2                  # Run a single task		
-#SBATCH --cpus-per-task=4            # Number of CPU cores per task
-#SBATCH --mem=32gb 
-#SBATCH --output=logs/slurm_%j.out
-#SBATCH --error=logs/slurm_%j.err
+#SBATCH --workdir=$(pwd)
+#SBATCH --nodes=2
+#SBATCH --ntasks=16
+#SBATCH --cpus-per-task=2
 
 source_dir="$(pwd)"
 report_dir="${source_dir}/reports"

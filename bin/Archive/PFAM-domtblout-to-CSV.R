@@ -85,7 +85,12 @@ read.PFAM.domtblout <- function(file.path, transcript.id){
     pfam.align.df <- read.table(file.path, header = F, row.names = NULL, comment.char = "#", sep = "", fill = T) # Note: fill = T to deal with description of protin domain being larger than other
     ## Edits: last column ('pfam.description') is separated since it contains >1 words
     rm.desc.pfam.align.df <- pfam.align.df[, 1:22]
-    pfam.desc.vec <- apply(pfam.align.df[, 23:ncol(pfam.align.df)], 1, paste , collapse = "_" )
+    # This condition is for when PFAM Domain description has only one word. # TODO: IMPROVE THIS 
+    if(ncol(pfam.align.df) == 23) {pfam.desc.vec = pfam.align.df[, 23]  
+    } else {
+    
+	pfam.desc.vec <- apply(pfam.align.df[, 23:ncol(pfam.align.df)], 1, paste , collapse = "_" )
+    } 
     ### Concatenate back
     pfam.desc.df <- rm.desc.pfam.align.df
     pfam.desc.df[, 23] <- pfam.desc.vec
@@ -106,7 +111,7 @@ read.PFAM.domtblout <- function(file.path, transcript.id){
 calculate.frac.alignment.domain <- function(al.to, al.from, hmm.length ){
   ## Calculate the fraction of AA of the HMM model spanned by the PFAM alignment
   ## This is to address Partiality in PFAM alignments. Based on the idea that an alignment of the query sequence (or a part of the query sequence) against 100% of the PFAM domain can be considered a functional domain. Whereas an alignment of 30% of the domain, can't.
-  frac.dom = ( al.to + 1 - al.from) / hmm.length
+  frac.dom = ( as.numeric(al.to) + 1 - as.numeric(al.from)) / as.numeric(hmm.length)
   frac.dom
 }
 
