@@ -82,10 +82,15 @@ read.PFAM.domtblout <- function(file.path, transcript.id){
     ## 2.2. Alignment with content.
     all.lines <- 1:length(line.list)
     filled.lines <- all.lines[!all.lines %in% uncommented.lines]
-    pfam.align.df <- read.table(file.path, comment.char = "#", sep = "")
+    pfam.align.df <- read.table(file.path, header = F, row.names = NULL, comment.char = "#", sep = "", fill = T) # Note: fill = T to deal with description of protin domain being larger than other
     ## Edits: last column ('pfam.description') is separated since it contains >1 words
     rm.desc.pfam.align.df <- pfam.align.df[, 1:22]
-    pfam.desc.vec <- apply(pfam.align.df[, 23:ncol(pfam.align.df)], 1, paste , collapse = "_" )
+    # This condition is for when PFAM Domain description has only one word. # TODO: IMPROVE THIS 
+    if(ncol(pfam.align.df) == 23) {pfam.desc.vec = pfam.align.df[, 23]  
+    } else {
+    
+	pfam.desc.vec <- apply(pfam.align.df[, 23:ncol(pfam.align.df)], 1, paste , collapse = "_" )
+    } 
     ### Concatenate back
     pfam.desc.df <- rm.desc.pfam.align.df
     pfam.desc.df[, 23] <- pfam.desc.vec
@@ -103,7 +108,17 @@ read.PFAM.domtblout <- function(file.path, transcript.id){
     return(pfam.df)
 }
 
+calculate.frac.alignment.domain <- function(al.to, al.from, hmm.length ){
+  ## Calculate the fraction of AA of the HMM model spanned by the PFAM alignment
+  ## This is to address Partiality in PFAM alignments. Based on the idea that an alignment of the query sequence (or a part of the query sequence) against 100% of the PFAM domain can be considered a functional domain. Whereas an alignment of 30% of the domain, can't.
+  frac.dom = ( as.numeric(al.to) + 1 - as.numeric(al.from)) / as.numeric(hmm.length)
+  frac.dom
+}
+
 # 1. Coerce domtblout to table
 pfam.table <- read.PFAM.domtblout(file.path = opt$input_file, transcript.id = opt$transcript_id)
-# 2. Save table
+# 2. Add Fraction of the PFAM Domain (HMM Model) spanned by the Alignment
+pfam.table[["Fraction.Al.Domain"]] <- apply(pfam.table[,c('alignment.to', 'alignment.from', 'hmm.length')], 1, function(x) calculate.frac.alignment.domain(al.to = x[1],  al.from = x[2],  hmm.length = x[3] ) )
+
+# 3. Save table
 write.table(pfam.table, file = opt$output_table,  quote = F, row.names = F, sep = "\t") # Important to save with a separating character that won't be present in the character strings output of the alignment, if not htis incurs problems in  the following Merging step
