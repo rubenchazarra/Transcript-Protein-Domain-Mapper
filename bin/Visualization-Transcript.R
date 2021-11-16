@@ -105,14 +105,14 @@ coerce.pfam.df.to.gviz.format <- function(pfam.genomic.coord){
              "end" = pfam.genomic.coord$end, 
              "width" = pfam.genomic.coord$width, 
              "strand" = pfam.genomic.coord$strand, 
-             "transcript" = pfam.genomic.coord$tx_id,
+             "transcript" = pfam.genomic.coord$transcript_id,
              "exon" = pfam.genomic.coord$exon_id,
              "protein" = pfam.genomic.coord$protein_id,
-             "symbol" = paste(pfam.genomic.coord$transcript, direction),
-             "PFAM.alignment.ID" = paste(pfam.genomic.coord$PFAM.alignment.ID, direction)
+             "symbol" = paste(pfam.genomic.coord$transcript_id, direction),
+             "pfam_alignment_id" = paste(pfam.genomic.coord$pfam_alignment_id, direction)
              )
   # convert alignment ID to character  Required for visualization
-  df[["symbol"]] = as.character(df[["PFAM.alignment.ID"]])
+  df[["symbol"]] = as.character(df[["pfam_alignment_id"]])
   return(df)
 }
 
@@ -147,7 +147,7 @@ transcript_track_list <-  generate_transcript_track(transcriptModel = transcript
 
 # 4. Read PFAM alignment genomic coordinates 
 # TODO: Find a way to map protein coordinates to genomic coordinates with GTF
-pfam.genomic.coord <- read.table(opt$pfam_genomic_coord, header = T)
+pfam.genomic.coord <- read.table(opt$pfam_genomic_coord, header = T, sep = "\t")
 # 5. Coere PFAM df to required visualization format
 pfam_model <- coerce.pfam.df.to.gviz.format(pfam.genomic.coord)
 

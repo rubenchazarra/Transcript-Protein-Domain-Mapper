@@ -45,12 +45,12 @@ suppressPackageStartupMessages(require(rtracklayer))
 ## Functions ##
 create.iranges.pfam <- function(pfam_alignment, protein_id){
   ## Create IRanges object from PFAM alignment data
-  pfam.al.start <- as.numeric(pfam_alignment[["alignment.from"]])
-  pfam.al.stop <- as.numeric(pfam_alignment[["alignment.to"]])
+  pfam.al.start <- as.numeric(pfam_alignment[["ali_from"]])
+  pfam.al.stop <- as.numeric(pfam_alignment[["ali_to"]])
   n.alignments <- length(pfam.al.start)
   protein_names <- rep(protein_id, times = n.alignments)
   # Create IRanges object
-  ir.prot <- IRanges(start = pfam.al.start, end = pfam.al.stop, names = protein_names)
+  ir.prot <- IRanges::IRanges(start = pfam.al.start, end = pfam.al.stop, names = protein_names)
   return(ir.prot)
 }
 
@@ -60,13 +60,11 @@ extract.prot.genomic.coord.iranges <- function(iranges_prot, edbx){
   return(prot.genome.coord)
 }
 
-create.empty.iranges.pfam <- function(transcript_id){
+create.empty.iranges.pfam <- function(transcript_id, chrN){
   ## Create empty Iranges-like data frame for empty PFAM alignment outputs
-  table.names <- c("PFAM.Alignment.ID",
-                   "Transcript.ID", 
-                   
-                   "PFAM.Domain",
-                   "PFAM.Domain.Description",
+  table.names <- c("pfam_alignment_id", 
+                   "pfam_domain", 
+                   "pfam_domain_description", 
                    
                    "seqnames", 
                    "start",
@@ -74,9 +72,9 @@ create.empty.iranges.pfam <- function(transcript_id){
                    "width", 
                    "strand", 
                    "protein_id", 
-                   "tx_id", 
+                   "transcript_id", 
                    "exon_id", 
-                   "exon_rank",  
+                   "exon_number",  
                    "cds_ok",  
                    "protein_start",  
                    "protein_end" )
@@ -84,12 +82,11 @@ create.empty.iranges.pfam <- function(transcript_id){
   empty.align <- rep(c(NA), times = length(table.names))
   names(empty.align) <- table.names
   
-  # Fill in the fields we can ('PFAM.alignment.ID', 'Transcript.ID', 'tx_id')
-  ## TODO: fetch chromosome number from 'transcript_id'
-  empty.align[["PFAM.Alignment.ID"]] = paste0(transcript_id, "-NA", "-from-NA-to-NA-n_domain-0")
-  empty.align[["Transcript.ID"]] = transcript_id
+  # Fill in the fields we can ('PFAM.alignment.ID', 'Transcript.ID', 'seqnames', 'tx_id')
+  empty.align[["pfam_alignment_id"]] = paste0(transcript_id, "-NA", "-from-NA-to-NA-", chrN)
+  empty.align[["seqnames"]] = chrN
+  empty.align[["transcript_id"]] = transcript_id
   
-  empty.align[["tx_id"]] = transcript_id
   empty.pfam.df = data.frame(t(empty.align))
   return(empty.pfam.df)
 }
@@ -100,26 +97,23 @@ extract.genomic.coord.pfam.alignment <- function(pfam_alignment, protein_id, edb
   ## Also Add PFAM alignment ID 
   
   # 1. Create PFAM alignment identifier string
-  pfam.alignment.id <- paste0(pfam_alignment[["transcript.id"]], "-",  pfam_alignment[["pfam.name"]], "-from-", as.numeric(pfam_alignment[["alignment.from"]]), "-to-", as.numeric(pfam_alignment[["alignment.to"]]), 
-                              "-n_domain-", as.numeric(pfam_alignment[["n.domain"]])) 
+  pfam.alignment.id <- paste0(pfam_alignment[["query_name"]], "-",  pfam_alignment[["domain_name"]], "-from-", as.numeric(pfam_alignment[["ali_from"]]),
+                       "-to-", as.numeric(pfam_alignment[["ali_to"]]), "-", chrN) 
   # 2. Create IRanges object
   ir.prot <- create.iranges.pfam(pfam_alignment, protein_id)
   # 3. Extract genomic coordinates
-  prot.genome.coord <- extract.prot.genomic.coord.iranges(iranges_prot = ir.prot, edbx = edbx)
-  prot.genome.coord.df <- lapply(prot.genome.coord, as.data.frame)[[1]]
+  prot.genome.coord.list <- extract.prot.genomic.coord.iranges(iranges_prot = ir.prot, edbx = edbx)
+  prot.genome.coord.df <- data.frame(unlist(prot.genome.coord.list, recursive = F, use.names = F))
   ## 4. Add alignment and transcript ID
   n.exons <- nrow(prot.genome.coord.df)
   
   pfam.alignment.id.df <- data.frame(
-    "PFAM.Alignment.ID" = rep(pfam.alignment.id, times = n.exons), 
-    "Transcript.ID" = rep(pfam_alignment[["transcript.id"]], times = n.exons), 
-    "PFAM.Domain" = rep(pfam_alignment[["pfam.name"]], times = n.exons), 
-    "PFAM.Domain.Description" = rep(pfam_alignment[["target.description"]], times = n.exons)
+    "pfam_alignment_id" = rep(pfam.alignment.id, times = n.exons), 
+    "pfam_domain" = rep(pfam_alignment[["domain_name"]], times = n.exons), 
+    "pfam_domain_description" = rep(pfam_alignment[["description"]], times = n.exons)
     )
-  ### Cbind pfam.alignment ID
-  prot.genome.coord.df <- cbind(pfam.alignment.id.df, prot.genome.coord.df)
-  
-  return(prot.genome.coord.df)
+  # 5. Merge 2 dfs
+  cbind(pfam.alignment.id.df, prot.genome.coord.df)
 }
 
 gtf_processing <- function(gtf, transcript_id){
@@ -151,32 +145,27 @@ protein_id <- unique(transcript_model[["protein_id"]])
 ## Strip gtf id version from protein_id
 protein_id <- gsub(pattern = "\\..*", replacement = "",  x = protein_id)
 ## Chromosome name
-chr_name <- as.character(unique(transcript_model[["seqnames"]]))
+chrN <- as.character(unique(transcript_model[["seqnames"]]))
 
 # 2. Read files
-pfam_alignment <- read.table(opt$pfam_alignment, header = T)
+pfam_alignment <- read.table(opt$pfam_alignment, header = T, sep = "\t", quote = "\"")
 
 # Condition: if PFAM alignment contains some output
 if(all(pfam_alignment[["pfam.match"]] == T)){
-  # Human Ensembl database object # <-- HardCoded
+  # NOTE: This is hard coded. Restricted to the Human ENS DB
   edbx <- EnsDb.Hsapiens.v86
   # 3. Extract genomic coordinates from PFAM alignments
   genomic.coord.list <- apply(pfam_alignment, 1, function(x) 
     extract.genomic.coord.pfam.alignment(pfam_alignment = x, protein_id = protein_id, edbx = edbx))
   ## Merge
   genomic.coord.df <- Reduce(rbind, genomic.coord.list)
-  # If No CDS found for: 'protein_id' --> DO SOMETHING HERE
+  # If No CDS found for: 'protein_id' --> DO SOMETHING HERE -- I am not sure this is a problem: if no CDS are found, the cds_ok values are set to FALSE, but no additional proble is seen
   #if(nrow(genomic.coord.df) == 0 ){
   #  genomic.coord.df <- create.empty.iranges.pfam(transcript_id = transcript_id)
   #}
 } else {
-  genomic.coord.df <- create.empty.iranges.pfam(transcript_id = transcript_id)
+  genomic.coord.df <- create.empty.iranges.pfam(transcript_id = transcript_id, chrN)
 }
-
-# 4. Add chromosome from transcript_id from transcript_GTF file
-genomic.coord.df[["seqnames"]] <- chr_name
-## 5. Add Chr name to PFAM alignment ID
-genomic.coord.df[["PFAM.Alignment.ID"]] = paste0(genomic.coord.df[["PFAM.Alignment.ID"]], "-", genomic.coord.df[["seqnames"]])
 
 # 6. Save 
 write.table(genomic.coord.df, file = opt$output_coord, sep = "\t", quote = F)

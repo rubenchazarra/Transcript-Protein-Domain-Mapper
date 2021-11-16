@@ -1,8 +1,11 @@
 #!/bin/sh
 
 #SBATCH --partition=interactive  # Partition to submit to
-#SBATCH --workdir=/home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/
 #SBATCH --qos=debug
+#SBATCH --workdir=$(pwd)
+#SBATCH --nodes=2
+#SBATCH --ntasks=16
+#SBATCH --cpus-per-task=2
 
 source_dir="$(pwd)"
 report_dir="${source_dir}/reports"

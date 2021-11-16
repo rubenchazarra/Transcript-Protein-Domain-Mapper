@@ -4,7 +4,7 @@
 # The Goal is to represent the Alternative Splicing Event. The transcripts involved in each AS event are defined in an external Aggregation CSV
 # TODO: Extract transcript genomic coordinates from GTF and not from EnsmblDB for consistency
 
-suppressPackageStartupMessages(require(optparse))
+suppressPackageStartupMessages(require("optparse"))
 
 option_list = list(
   make_option(
@@ -22,6 +22,13 @@ option_list = list(
     help = 'The ID of the AS Event to be represented. This will appear in the PDF Plot Title.'
   ),
   make_option(
+    c("-g", "--gene_id"),
+    action = "store",
+    default = NA,
+    type = 'character',
+    help = 'Gene ID (in HGNC Format) of the Alternative Splicing Event'
+  ),
+  make_option(
     c("-p", "--pfam_path"),
     action = "store",
     default = NA,
@@ -29,7 +36,7 @@ option_list = list(
     help = 'Path to the directory where the PFAM alignments of the differents Transcripts to represent are located.'
   ), 
   make_option(
-    c("-g", "--gtf_path"),
+    c("-t", "--gtf_path"),
     action = "store",
     default = NA,
     type = 'character',
@@ -72,7 +79,7 @@ create.file.path.list <- function(file.path, file.patt, transcript_ids){
   list.order <- lapply(transcript_ids, function(tr) grep(tr, file.vec))
   # Order list to match: TranscriptID - file
   path.list <- as.list(file.vec[unlist(list.order)])
-  names(path.list) <- transcript_ids  # TODO: PROBLEM HERE
+  names(path.list) <- transcript_ids
   return(path.list)
 }
 
@@ -154,16 +161,16 @@ coerce.pfam.df.to.gviz.format <- function(pfam.genomic.coord){
                   "end" = pfam.genomic.coord$end, 
                   "width" = pfam.genomic.coord$width, 
                   "strand" = pfam.genomic.coord$strand, 
-                  "transcript" = pfam.genomic.coord$tx_id,
+                  "transcript" = pfam.genomic.coord$transcript_id,
                   "exon" = pfam.genomic.coord$exon_id,
                   "protein" = pfam.genomic.coord$protein_id,
-                  "symbol" = paste(pfam.genomic.coord$transcript, direction),
-                  "PFAM.Alignment.ID" = paste(pfam.genomic.coord$PFAM.Alignment.ID, direction), 
-                  "PFAM.Domain" = pfam.genomic.coord$PFAM.Domain, 
-                  "PFAM.Domain.Description" = pfam.genomic.coord$PFAM.Domain.Description
+                  "symbol" = paste(pfam.genomic.coord$transcript_id, direction),
+                  "pfam_alignment_id" = paste(pfam.genomic.coord$pfam_alignment_id, direction), 
+                  "pfam_domain" = pfam.genomic.coord$pfam_domain, 
+                  "pfam_domain_description" = pfam.genomic.coord$pfam_domain_description
   )
   # Convert alignment ID to character  Required for visualization
-  df[["symbol"]] = as.character(df[["PFAM.Alignment.ID"]])
+  df[["symbol"]] = as.character(df[["pfam_alignment_id"]])
   return(df)
 }
 
@@ -180,17 +187,20 @@ integrate.tracks <- function(itrack, gtrack, transcript.track.list, pfam.track.l
 }
 
 ## 8. Plot track list
-plot.tracks <- function(track.list, event.id, out.pdf.path){
+plot.tracks <- function(track.list, plot.title, out.pdf.path){
   ## Save the Track Plot to PDF file in 'out_pdf_path'
   pdf(out.pdf.path)
-  Gviz::plotTracks(main = event.id, track.list)
+  Gviz::plotTracks(track.list, 
+                   main = plot.title, 
+                   cex.main = 1 
+                   )
   dev.off()
 }
 
 ## Execute
 
 # 1) Transcript IDs of the AS event to represent
-transcript_ids <-  as.character(opt$transcript_ids)
+transcript_ids <-  opt$transcript_ids
 replace_chars <- c("[][]", " ") # We want to replace the square brackets, because nextflow inputs transcript_ids tuple as a value --> "[tr_id_1, tr_id_2]"
 for (char in replace_chars){ transcript_ids <-  gsub(transcript_ids, pattern = char, replacement = "") }
 transcript_ids <- unlist(strsplit(transcript_ids , ","))# split by comma
@@ -200,9 +210,9 @@ transcript_ids <- unlist(strsplit(transcript_ids , ","))# split by comma
 pfam.list <- create.file.path.list(file.path = opt$pfam_path, 
                                    file.patt = ".txt", 
                                    transcript_ids = transcript_ids)
-pfam.list <- lapply(pfam.list, function(path) read.table(path, header = T))
+pfam.list <- lapply(pfam.list, function(path) read.table(path, header = T, sep = "\t"))
 ## Filter for Transcripts with NO PFAM Hit
-pfam.hits <- unlist(lapply(pfam.list, function(pfam_df) all(!is.na(pfam_df[["PFAM.Domain"]]))))
+pfam.hits <- unlist(lapply(pfam.list, function(pfam_df) all(!is.na(pfam_df[["pfam_domain"]]))))
 pfam.list <- pfam.list[pfam.hits]
 
 ## 3) Read and process transcript-GTF File List
@@ -210,11 +220,11 @@ gtf.list <- create.file.path.list(file.path = opt$gtf_path,
                                   file.patt = ".gtf",
                                   transcript_ids = transcript_ids)
 gtf.list <- lapply(gtf.list, function(path) data.frame(rtracklayer::import(path)))
-
+gtf.list <- gtf.list[pfam.hits]
 # 4) Process Files
 ## PFAM File List
 ### Coerce PFAM Df to GViz Format
-pfam.gviz.list <- lapply(pfam.list, function(pfam_df)  coerce.pfam.df.to.gviz.format(pfam.genomic.coord = pfam_df))
+pfam.gviz.list <- lapply(pfam.list, function(pfam_df) coerce.pfam.df.to.gviz.format(pfam.genomic.coord = pfam_df))
 
 ## GTF File List
 gtf.processed.list <- lapply(names(gtf.list), function(tr_name) gtf_processing(gtf = gtf.list[[tr_name]], transcript_id = tr_name))
@@ -238,11 +248,8 @@ chr <- extract.chr.num(gtf.list = gtf.list)
 cytoBand <- read.table(opt$cytoBand, header = T, sep = "\t") # 2. Read cytoband information from UCSC, required to generate the chromosome Ideogram without connection to the UCSC server
 itrack <- IdeogramTrack(genome = gen, chromosome = chr, bands = cytoBand)
 
-
-
 # 5.3) Transcript Tracks
-transcript.track.list <- lapply(names(gtf.processed.list), function(tr_name) generate.transcript.track(coord_df = gtf.processed.list[[tr_name]],
-                                                                                                       id_name = "transcript_id",
+transcript.track.list <- lapply(names(gtf.processed.list), function(tr_name) generate.transcript.track(coord_df = gtf.processed.list[[tr_name]],                                                                                                       id_name = "transcript_id",
                                                                                                        gen = gen, chr = chr,
                                                                                                        color = "palegreen3"))
 ## Add names
@@ -266,4 +273,9 @@ track.list <- integrate.tracks(itrack = itrack,
 saveRDS(track.list, file = opt$viz_track_list)
 
 # 8) Generate and Save Track Plot
-plot.tracks(track.list = track.list, event.id = opt$event_id, out.pdf.path = opt$viz_track_plot)
+gene.id <- opt$gene_id
+event.id <- opt$event_id
+plot.tracks(track.list = track.list, 
+            plot.title = paste0(gene.id, "-", event.id), 
+            out.pdf.path = opt$viz_track_plot)
+
