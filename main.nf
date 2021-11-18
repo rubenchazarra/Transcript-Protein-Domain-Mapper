@@ -32,7 +32,7 @@ process get_CDS_and_Protein_local {
 	    	else if (filename.indexOf("${transcript_id}.protein.fasta") > 0) "2.Protein-Fasta/$filename"
 	    }
 	
-	errorStrategy { task.exitStatus == 1 ? 'retry' : 'ignore' }
+	errorStrategy 'ignore'
 	
 	input:
 	set val(transcript_id), file(genome_fasta), file(GTF_file) from ch_local_transcript_id	
@@ -61,7 +61,7 @@ process query_PFAM_local {
 	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
-	errorStrategy { task.exitStatus == 1 ? 'retry' : 'ignore' }
+	errorStrategy 'ignore'
 	
 	input:
 	set val(transcript_id), file(transcript_GTF_file), file(protein_fasta) from ch_query_PFAM_local	
@@ -90,7 +90,7 @@ process parse_PFAM_out {
 	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
-	errorStrategy { task.exitStatus == 1 ? 'retry' : 'ignore' }
+	errorStrategy 'ignore'
 	
 	input:
 	set val(transcript_id), file(transcript_GTF_file), file(pfam_alignment) from ch_PFAM_output_local	
@@ -117,7 +117,7 @@ process merge_PFAM_output {
 	tag "Merge PFAM outputs" 
 	publishDir "${outdir}/${run_tag}/4.Merged-PFAM-output/",  mode: 'copy'
 	
-	errorStrategy { task.exitStatus == 1 ? 'retry' : 'ignore' }
+	errorStrategy 'ignore'
 	
 	input:
 	//file("pfam/") from ch_merge_PFAM_alignments.collect()
@@ -143,7 +143,7 @@ process map_genomic_coord_ens {
 	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
-	errorStrategy { task.exitStatus == 1 ? 'retry' : 'ignore' }
+	errorStrategy 'ignore'
 	
 	input:
 	set val(transcript_id), file(transcript_GTF_file), file(pfam_alignment) from ch_genomic_coord_PFAM	
@@ -174,7 +174,7 @@ process map_genomic_coord_gtf {
 	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
-	errorStrategy { task.exitStatus == 1 ? 'retry' : 'ignore' }
+	errorStrategy 'ignore'
 	
 	input:
 	set val(transcript_id), file(transcript_GTF_file), file(pfam_alignment), file(protein_fasta) from ch_genomic_coord_PFAM_protein
@@ -204,7 +204,7 @@ process visualization_transcript {
 	    	else if (filename.indexOf(".pdf") > 0) "$filename"
 	    }
 	
-	errorStrategy { task.exitStatus == 1 ? 'retry' : 'ignore' }
+	errorStrategy 'ignore'
 	
 	when:
 	params.viz & params.viz_transcript
@@ -254,7 +254,7 @@ process visualization_event {
 	    	else if (filename.indexOf(".pdf") > 0) "$filename"
 	    }
 	
-	errorStrategy { task.exitStatus == 1 ? 'retry' : 'ignore' }
+	errorStrategy 'ignore'
 	
 	when: 
 	params.viz & params.viz_event
@@ -288,7 +288,7 @@ process merge_gencoords_GTF {
 	tag "Merge PFAM GenCoords GTF" 
 	publishDir "${outdir}/${run_tag}/5.PFAM-GenCoords-GTF-Merged/",  mode: 'copy'
 	
-	errorStrategy { task.exitStatus == 1 ? 'retry' : 'ignore' }
+	errorStrategy 'ignore'
 	
 	input:
 	file("genomic-coord-pfam/") from ch_merge_gcoords_PFAM.collect()
@@ -309,7 +309,7 @@ process merge_gencoords_EnsemblDB {
 	tag "Merge PFAM GenCoords EnsemblDB" 
 	publishDir "${outdir}/${run_tag}/5.PFAM-GenCoords-EnsemblDB-Merged/",  mode: 'copy'
 	
-	errorStrategy { task.exitStatus == 1 ? 'retry' : 'ignore' }
+	errorStrategy 'ignore'
 	
 	input:
 	file("genomic-coord-pfam/") from ch_merge_gcoords_EnsemblDB.collect()

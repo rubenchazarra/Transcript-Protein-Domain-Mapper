@@ -285,7 +285,7 @@ integrate.al.pfam.with.coords <- function(al.pfam, pfam_gcords){
   # 2. Create PFAM alignment identifier string
   al.pfam.id <- paste0(al.pfam[["query_name"]], "-",  al.pfam[["domain_name"]],
                        "-from-", as.numeric(al.pfam[["ali_from"]]),
-                       "-to-", as.numeric(al.pfam[["ali_to"]]), "-", chrN) 
+                       "-to-", as.numeric(al.pfam[["ali_to"]]), "-", chrN ) 
   # 3. Number of exons in pfam_gcords
   n.exons <- pfam_gcords@seqnames@lengths 
   # 4. PFAM Metadata DF
@@ -321,7 +321,7 @@ create.empty.iranges.pfam <- function(transcript_id, chrN) {
   names(empty.align) <- table.names
   
   # Fill in the fields we can ('PFAM.alignment.ID', 'Transcript.ID', 'seqnames', 'tx_id')
-  empty.align[["pfam_alignment_id"]] = paste0(transcript_id, "-NA", "-from-NA-to-NA-", chrN)
+  empty.align[["pfam_alignment_id"]] = paste0(transcript_id, "-NA", "-from-NA-to-NA-", chrN )
   empty.align[["seqnames"]] = chrN
   empty.align[["transcript_id"]] = transcript_id
   
