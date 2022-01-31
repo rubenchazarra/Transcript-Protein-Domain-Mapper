@@ -11,10 +11,10 @@ report_dir="${source_dir}/reports"
 export NXF_OPTS="-Xms500M -Xmx2G"
 
 module load nextflow
-/apps/NEXTFLOW/19.03.0/nextflow run "${source_dir}/main.nf" \
+nextflow run "${source_dir}/main.nf" \
 	-with-report "${report_dir}/report.html" \
         -with-trace "${report_dir}/trace.txt" \
         -with-timeline "${report_dir}/timeline.html" \
 	-with-dag "${report_dir}/flowchart.png" \
 	-profile local \
-	-resume modest_hawking
+	-resume pedantic_torvalds

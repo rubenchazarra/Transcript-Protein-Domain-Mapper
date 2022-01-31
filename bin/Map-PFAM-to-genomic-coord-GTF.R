@@ -359,11 +359,11 @@ if(all(al.pfam[["pfam_match"]] == TRUE)){
     # 3. Split PFAM alignment to list
     al.pfam.list <- split(al.pfam, seq(nrow(al.pfam))) # each row is an element of the list now
     # 4. Integrate PFAM domain data with PFAM alignment genomic coordinates
-    pfam.coords.list <- mapply(function(al.pfam.list, pfam_gcords) integrate.al.pfam.with.coords(al.pfam, pfam_gcords), al.pfam.list, pfam_gcords, SIMPLIFY = F)
+    pfam.coords.list <- mapply(function(al.pfam, pfam_gcords_i) integrate.al.pfam.with.coords(al.pfam, pfam_gcords_i), al.pfam.list, pfam_gcords, SIMPLIFY = F)
     # 5. Merge dfs to single df
     pfam.coords.df <- Reduce(rbind, pfam.coords.list)
     # 6. Order df bu 'exon_number'
-    pfam.coords.df <-  pfam.coords.df[ order(as.numeric(pfam.coords.df$exon_number, decreasing = F)), ]
+    #pfam.coords.df <-  pfam.coords.df[ order(as.numeric(pfam.coords.df$exon_number, decreasing = F)), ]
   # If PFAM alignment is empty
   } else if (all(al.pfam[["pfam_match"]] == FALSE)) {
     chrN <- unique(seqnames(gtf))

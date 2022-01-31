@@ -1,4 +1,4 @@
-#!/home/bsc83/bsc83930/miniconda3/bin nextflow
+#!/apps/NEXTFLOW/21.04.1/ nextflow
 
 // Aternative Splicing Functional Consequence Evaluatori ||  Developed by Ruben Chazarra-Gil (https://github.com/rubenchazarra)
 
@@ -27,12 +27,14 @@ process get_CDS_and_Protein_local {
 	tag "Get CDS $transcript_id"
 	
 	publishDir "${outdir}/${run_tag}/", mode: 'copy',
-	    saveAs: {filename ->
-	    	if (filename.indexOf("${transcript_id}.fasta") > 0) "1.CDS-Fasta/$filename"
-	    	else if (filename.indexOf("${transcript_id}.protein.fasta") > 0) "2.Protein-Fasta/$filename"
+	    saveAs: { filename ->
+	    	if (filename == "${transcript_id}.fasta") "1.CDS-Fasta/$filename"
+	    	else if (filename == "${transcript_id}.protein.fasta") "2.Protein-Fasta/$filename"
+	    	else if (filename.indexOf(".gtf") > 0) "0.Transcript-GTF/$filename"
 	    }
 	
-	errorStrategy 'ignore'
+	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+	// memory = 2.GB	
 	
 	input:
 	set val(transcript_id), file(genome_fasta), file(GTF_file) from ch_local_transcript_id	
@@ -61,7 +63,8 @@ process query_PFAM_local {
 	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
-	errorStrategy 'ignore'
+	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+	// memory = 2.GB	
 	
 	input:
 	set val(transcript_id), file(transcript_GTF_file), file(protein_fasta) from ch_query_PFAM_local	
@@ -69,15 +72,16 @@ process query_PFAM_local {
 	output:
 	set val(transcript_id), file(transcript_GTF_file), file("${transcript_id}-pfam-domtblout.txt") into ch_PFAM_output_local	
 	set val(transcript_id), file(protein_fasta) into ch_protein_fasta 
-	
+	file("${transcript_id}-pfam-domtblout-with-alignment.txt")	
 	script:
 	def local_PFAM_DB = params.query_PFAM.local_PFAM_DB	
 	"""
 	/home/bsc83/bsc83930/TFM-UOC-BSC/AS_Function_Evaluator/local-install-HMMER/hmmer-3.3.2/bin/hmmscan --domtblout "${transcript_id}-pfam-domtblout.txt" \
-		-E 1e-5 \
-		--cpu 4 \
+		-E 10 \
+		--domE 10 \
+		--cpu 1 \
 		${local_PFAM_DB} \
-		${protein_fasta} \
+		${protein_fasta} > "${transcript_id}-pfam-domtblout-with-alignment.txt"
 	# Usage: --domtbout (one line per domain); -E (report models <= this E-value threshold in output); --domE ( report domains <= this E-value threshold in output  [10.0])	
 	"""
 	}
@@ -90,7 +94,8 @@ process parse_PFAM_out {
 	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
-	errorStrategy 'ignore'
+	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+	// memory = 2.GB	
 	
 	input:
 	set val(transcript_id), file(transcript_GTF_file), file(pfam_alignment) from ch_PFAM_output_local	
@@ -100,7 +105,7 @@ process parse_PFAM_out {
 	
 	script:
 	"""
-       	module load R/3.6.1
+	module load R/3.6.1
 	${baseDir}/bin/Hmmscan-dmtblout-Parser.R \
 		--hmmscan_tbl ${pfam_alignment} \
 		--rhmmer_path ${baseDir}/bin/rhmmer.R \
@@ -115,12 +120,12 @@ ch_merge_PFAM_alignments = ch_merge_PFAM_output.map { it -> it[2] }.collect()
 // Merge PFAM output
 process merge_PFAM_output {
 	tag "Merge PFAM outputs" 
-	publishDir "${outdir}/${run_tag}/4.Merged-PFAM-output/",  mode: 'copy'
+	publishDir "${outdir}/${run_tag}/3.PFAM-DomTblOut-Merged/",  mode: 'copy'
 	
-	errorStrategy 'ignore'
+	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+	// memory = 2.GB	
 	
 	input:
-	//file("pfam/") from ch_merge_PFAM_alignments.collect()
 	file("pfam/") from ch_merge_PFAM_alignments
 		
 	output:
@@ -143,7 +148,8 @@ process map_genomic_coord_ens {
 	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
-	errorStrategy 'ignore'
+	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+	// memory = 2.GB	
 	
 	input:
 	set val(transcript_id), file(transcript_GTF_file), file(pfam_alignment) from ch_genomic_coord_PFAM	
@@ -153,7 +159,7 @@ process map_genomic_coord_ens {
 	
 	script:
 	"""
-       	module load R
+       	module load R/3.6.1
 	${baseDir}/bin/Map-PFAM-to-genomic-coord-EnsemblDB.R \
 		--pfam_alignment ${pfam_alignment} \
 		--gtf ${transcript_GTF_file} \
@@ -174,7 +180,8 @@ process map_genomic_coord_gtf {
 	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
-	errorStrategy 'ignore'
+	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+	// memory = 2.GB	
 	
 	input:
 	set val(transcript_id), file(transcript_GTF_file), file(pfam_alignment), file(protein_fasta) from ch_genomic_coord_PFAM_protein
@@ -204,7 +211,8 @@ process visualization_transcript {
 	    	else if (filename.indexOf(".pdf") > 0) "$filename"
 	    }
 	
-	errorStrategy 'ignore'
+	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+	// memory = 2.GB	
 	
 	when:
 	params.viz & params.viz_transcript
@@ -254,7 +262,8 @@ process visualization_event {
 	    	else if (filename.indexOf(".pdf") > 0) "$filename"
 	    }
 	
-	errorStrategy 'ignore'
+	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+	// memory = 2.GB	
 	
 	when: 
 	params.viz & params.viz_event
@@ -283,15 +292,20 @@ process visualization_event {
 	"""
 }
 
+// Collect GenCoords-GTF
+
+ch_merge_gcoords_gtf = ch_merge_gcoords_PFAM.map { it -> it[2] }.collect()
+
 // Merge Genomic coordinates from GTF Approach
 process merge_gencoords_GTF {
 	tag "Merge PFAM GenCoords GTF" 
 	publishDir "${outdir}/${run_tag}/5.PFAM-GenCoords-GTF-Merged/",  mode: 'copy'
 	
-	errorStrategy 'ignore'
+	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+	// memory = 2.GB	
 	
 	input:
-	file("genomic-coord-pfam/") from ch_merge_gcoords_PFAM.collect()
+	file("genomic-coord-pfam/") from ch_merge_gcoords_gtf
 		
 	output:
 	file("PFAM-GenCoords-GTF-Merged.txt") 
@@ -304,16 +318,20 @@ process merge_gencoords_GTF {
 	"""
 }
 
+// Collect GenCoords-EnsemblDB
+ch_merge_gcoords_ens = ch_merge_gcoords_EnsemblDB.map { it -> it[2] }.collect()
+
 // Merge Genomic coordinates from EnsemblDB Approach
 process merge_gencoords_EnsemblDB {
 	tag "Merge PFAM GenCoords EnsemblDB" 
 	publishDir "${outdir}/${run_tag}/5.PFAM-GenCoords-EnsemblDB-Merged/",  mode: 'copy'
 	
-	errorStrategy 'ignore'
+	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+	// memory = 2.GB	
 	
 	input:
-	file("genomic-coord-pfam/") from ch_merge_gcoords_EnsemblDB.collect()
-		
+	file("genomic-coord-pfam/") from ch_merge_gcoords_ens	
+	
 	output:
 	file("PFAM-GenCoords-EnsemblDB-Merged.txt") 
 	
