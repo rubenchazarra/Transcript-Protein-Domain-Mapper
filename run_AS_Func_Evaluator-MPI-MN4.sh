@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 # Run AS_Functional_Evaluator nextflow pipeline
 
@@ -10,11 +10,14 @@ report_dir="${source_dir}/reports"
 
 export NXF_OPTS="-Xms500M -Xmx2G"
 
-module load nextflow
-nextflow run "${source_dir}/main.nf" \
+# For execution as MPI (for many low-intensive processes)
+export NXF_CLUSTER_SEED=$(shuf -i 0-16777216 -n 1)
+
+srun /apps/NEXTFLOW/21.04.1/nextflow run "${source_dir}/main.nf" \
 	-with-report "${report_dir}/report.html" \
         -with-trace "${report_dir}/trace.txt" \
         -with-timeline "${report_dir}/timeline.html" \
 	-with-dag "${report_dir}/flowchart.png" \
-	-profile local \
-	-resume pedantic_torvalds
+	-with-mpi \
+	-profile slurm \
+	-resume modest_hawking

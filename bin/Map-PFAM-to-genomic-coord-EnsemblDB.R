@@ -98,7 +98,7 @@ extract.genomic.coord.pfam.alignment <- function(pfam_alignment, protein_id, edb
   
   # 1. Create PFAM alignment identifier string
   pfam.alignment.id <- paste0(pfam_alignment[["query_name"]], "-",  pfam_alignment[["domain_name"]], "-from-", as.numeric(pfam_alignment[["ali_from"]]),
-                       "-to-", as.numeric(pfam_alignment[["ali_to"]]), "-", chrN) 
+                       "-to-", as.numeric(pfam_alignment[["ali_to"]]), "-", chrN ) 
   # 2. Create IRanges object
   ir.prot <- create.iranges.pfam(pfam_alignment, protein_id)
   # 3. Extract genomic coordinates
@@ -151,7 +151,7 @@ chrN <- as.character(unique(transcript_model[["seqnames"]]))
 pfam_alignment <- read.table(opt$pfam_alignment, header = T, sep = "\t", quote = "\"")
 
 # Condition: if PFAM alignment contains some output
-if(all(pfam_alignment[["pfam.match"]] == T)){
+if(all(pfam_alignment[["pfam_match"]] == TRUE)){
   # NOTE: This is hard coded. Restricted to the Human ENS DB
   edbx <- EnsDb.Hsapiens.v86
   # 3. Extract genomic coordinates from PFAM alignments
@@ -163,7 +163,7 @@ if(all(pfam_alignment[["pfam.match"]] == T)){
   #if(nrow(genomic.coord.df) == 0 ){
   #  genomic.coord.df <- create.empty.iranges.pfam(transcript_id = transcript_id)
   #}
-} else {
+  } else if(all(pfam_alignment[["pfam_match"]] == FALSE)){
   genomic.coord.df <- create.empty.iranges.pfam(transcript_id = transcript_id, chrN)
 }
 

@@ -285,7 +285,7 @@ integrate.al.pfam.with.coords <- function(al.pfam, pfam_gcords){
   # 2. Create PFAM alignment identifier string
   al.pfam.id <- paste0(al.pfam[["query_name"]], "-",  al.pfam[["domain_name"]],
                        "-from-", as.numeric(al.pfam[["ali_from"]]),
-                       "-to-", as.numeric(al.pfam[["ali_to"]]), "-", chrN) 
+                       "-to-", as.numeric(al.pfam[["ali_to"]]), "-", chrN ) 
   # 3. Number of exons in pfam_gcords
   n.exons <- pfam_gcords@seqnames@lengths 
   # 4. PFAM Metadata DF
@@ -321,7 +321,7 @@ create.empty.iranges.pfam <- function(transcript_id, chrN) {
   names(empty.align) <- table.names
   
   # Fill in the fields we can ('PFAM.alignment.ID', 'Transcript.ID', 'seqnames', 'tx_id')
-  empty.align[["pfam_alignment_id"]] = paste0(transcript_id, "-NA", "-from-NA-to-NA-", chrN)
+  empty.align[["pfam_alignment_id"]] = paste0(transcript_id, "-NA", "-from-NA-to-NA-", chrN )
   empty.align[["seqnames"]] = chrN
   empty.align[["transcript_id"]] = transcript_id
   
@@ -359,11 +359,11 @@ if(all(al.pfam[["pfam_match"]] == TRUE)){
     # 3. Split PFAM alignment to list
     al.pfam.list <- split(al.pfam, seq(nrow(al.pfam))) # each row is an element of the list now
     # 4. Integrate PFAM domain data with PFAM alignment genomic coordinates
-    pfam.coords.list <- mapply(function(al.pfam.list, pfam_gcords) integrate.al.pfam.with.coords(al.pfam, pfam_gcords), al.pfam.list, pfam_gcords, SIMPLIFY = F)
+    pfam.coords.list <- mapply(function(al.pfam, pfam_gcords_i) integrate.al.pfam.with.coords(al.pfam, pfam_gcords_i), al.pfam.list, pfam_gcords, SIMPLIFY = F)
     # 5. Merge dfs to single df
     pfam.coords.df <- Reduce(rbind, pfam.coords.list)
     # 6. Order df bu 'exon_number'
-    pfam.coords.df <-  pfam.coords.df[ order(as.numeric(pfam.coords.df$exon_number, decreasing = F)), ]
+    #pfam.coords.df <-  pfam.coords.df[ order(as.numeric(pfam.coords.df$exon_number, decreasing = F)), ]
   # If PFAM alignment is empty
   } else if (all(al.pfam[["pfam_match"]] == FALSE)) {
     chrN <- unique(seqnames(gtf))
