@@ -1,3 +1,4 @@
+suppressPackageStartupMessages(require(magrittr))
 #' Read a file created through the '----tblout' option
 #'
 #' @param file Filename

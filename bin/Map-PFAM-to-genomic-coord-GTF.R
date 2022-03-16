@@ -3,6 +3,9 @@
 ## Script to map PFAM domain alignment coordinates to genomic coordinates
 ## This is done manually (with a GTF annotation file), without the need of Ens Annotation package
 
+## Note: The 'cds_ok' column in the output depicts if there is a coincidence between the pfam genomic coordinates and the length of the transcript CDS 
+######## This is the only thing for which we need the protein CDS sequence so we could potentially remove this
+
 suppressPackageStartupMessages(require(optparse))
 
 option_list = list(
@@ -12,7 +15,7 @@ option_list = list(
     default = NA,
     type = 'character',
     help = 'PFAM alignment file'
-  ), 
+  ),
   make_option(
     c("-t", "--transcript_id"),
     action = "store",
@@ -340,8 +343,8 @@ transcript_id <- opt$transcript_id
 # 1. Read Files
 ## 1.1. Transcript GTF 
 gtf <- rtracklayer::import(opt$gtf)
-# protein_id <- unique(gtf$protein_id)
-protein_id <- unlist(strsplit(unique(gtf$protein_id), "[.]"))[1] # This is to remove the protein suffix
+# Protein ID ( remove suffix )
+protein_id <- unlist(strsplit(unique(gtf$protein_id), "[.]"))[1]
 
 ## 1.2. Protein sequence
 prot_seq <- read_fasta_prot(file.path = opt$protein_fasta)
@@ -361,13 +364,18 @@ if(all(al.pfam[["pfam_match"]] == TRUE)){
     # 4. Integrate PFAM domain data with PFAM alignment genomic coordinates
     pfam.coords.list <- mapply(function(al.pfam, pfam_gcords_i) integrate.al.pfam.with.coords(al.pfam, pfam_gcords_i), al.pfam.list, pfam_gcords, SIMPLIFY = F)
     # 5. Merge dfs to single df
-    pfam.coords.df <- Reduce(rbind, pfam.coords.list)
+    pfam.coords.df <- data.table::rbindlist(pfam.coords.list)
     # 6. Order df bu 'exon_number'
     #pfam.coords.df <-  pfam.coords.df[ order(as.numeric(pfam.coords.df$exon_number, decreasing = F)), ]
-  # If PFAM alignment is empty
+    # 7. Add partiality
+    chrN <- as.character(unique(pfam.coords.df[["seqnames"]]))
+    al.pfam[["pfam_alignment_id"]] <- paste0(al.pfam[["query_name"]], "-", al.pfam[["domain_name"]], "-from-", al.pfam[["ali_from"]], "-to-", al.pfam$ali_to, "-", rep(chrN, times = nrow(al.pfam)))
+    cols.interest <- c("pfam_alignment_id", "partiality")
+    pfam.coords.df <- merge(x = pfam.coords.df, y = al.pfam[, cols.interest], by = "pfam_alignment_id")
+    # If PFAM alignment is empty
   } else if (all(al.pfam[["pfam_match"]] == FALSE)) {
     chrN <- unique(seqnames(gtf))
-    # Create empty dataframe if no PFAM hit was retrieved
+    # Create empty data.frame if no PFAM hit was retrieved
     pfam.coords.df <- create.empty.iranges.pfam(transcript_id = transcript_id, chrN = chrN)
   }
 

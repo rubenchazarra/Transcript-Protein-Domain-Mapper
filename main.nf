@@ -2,9 +2,9 @@
 
 // Transcript Protein Domain Mapper ||  Developed by Ruben Chazarra-Gil (https://github.com/rubenchazarra)
 
-// Inputs of the pipeline: i) list of protein coding transcript ids, ii) AS event visualization aggregation file || Additinal files required: i) Annotation GTF file, ii) Genome.fasta, iii) Local installation of PFAM database, iv) UCSC Cytoband file for visualization
+// Inputs of the pipeline: i) list of protein coding transcript ids, ii) AS event visualisation aggregation file || Additinal files required: i) Annotation GTF file, ii) Genome.fasta, iii) Local installation of PFAM database, iv) UCSC Cytoband file for visualisation
 
-// Pipeline: for each input transcript, we extract its coding sequence and translated it. With the protein sequence we query the PFAM protein domain database. The PFAM alignment relative coordinates are converted to genomic coordinates to enable visualization of the transcript models together with their PFAM hits.
+// Pipeline: for each input transcript, we extract its coding sequence and translated it. With the protein sequence we query the PFAM protein domain database. The PFAM alignment relative coordinates are converted to genomic coordinates to enable visualisation of the transcript models together with their PFAM hits.
 
 // Params
 outdir = params.outdir
@@ -95,7 +95,7 @@ process pfam {
 process parse_pfam {
 	tag "Parse PFAM $transcript_id"
 	
-	publishDir "${results_dir}/4.PFAM-DmTblOut-CSV", mode: 'copy',
+	publishDir "${results_dir}/4.PFAM-DomTblOut-CSV", mode: 'copy',
 	    saveAs: {filename ->
 	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
@@ -192,7 +192,7 @@ process map_genomic_coord_gtf {
 	set val(transcript_id), file(transcript_gtf), file(pfam_al), file(protein_fasta) from pfam_genomic_coord_gtf_ch
 	
 	output:
-	set val(transcript_id), file(transcript_gtf), file("${transcript_id}-PFAM-GenCoords-GTF.txt") into merge_gcoords_pfam_ch, visualization_transcript_ch, visualization_aggr_ch 
+	set val(transcript_id), file(transcript_gtf), file("${transcript_id}-PFAM-GenCoords-GTF.txt") into merge_gcoords_pfam_ch, visualisation_transcript_ch, visualisation_aggr_ch 
 	
 	script:
 	"""
@@ -207,10 +207,10 @@ process map_genomic_coord_gtf {
 	}
 
 // Visualize Transcript Model + PFAM alignment
-process visualization_transcript {
+process visualisation_transcript {
 	tag "Visualize PFAM alignment $transcript_id"
 	
-	publishDir "${results_dir}/6.Visualization-Transcript", mode: 'copy',
+	publishDir "${results_dir}/6.Visualisation-Transcript", mode: 'copy',
 	    saveAs: {filename ->
 	    	if (filename.indexOf(".rds") > 0) "$filename"
 	    	else if (filename.indexOf(".pdf") > 0) "$filename"
@@ -220,48 +220,49 @@ process visualization_transcript {
 	// memory = 2.GB	
 	
 	when:
-	params.viz & params.viz_transcript
+	params.vis & params.vis_transcript
 		
 	input:
-	set val(transcript_id), file(transcript_gtf_file), file(pfam_al) from visualization_transcript_ch
+	set val(transcript_id), file(transcript_gtf), file(pfam_al) from visualisation_transcript_ch
 	
 	output:
 	file("*.rds")
 	file("*.pdf")
 	
 	script:
+	def cyto_band = params.visualisation.cyto_band	
 	"""
        	module load R/3.6.1
-	Visualization-Transcript.R \
+	Visualisation-Transcript-v2.R \
 		--transcript_id  ${transcript_id} \
 		--pfam_genomic_coord ${pfam_al} \
-		--gtf ${transcript_gtf_file} \
-		--cytoBand ${params.visualization.cytoBand_table} \
-		--viz_track_plot  "${transcript_id}-Gviz-Trackplot.pdf" \
-		--viz_track_list  "${transcript_id}-Gviz-Trackplot.rds" \
+		--gtf ${transcript_gtf} \
+		--cytoBand ${params.visualisation.cytoBand_table} \
+		--vis_track_plot  "${transcript_id}-Gviz-Trackplot.pdf" \
+		--vis_track_list  "${transcript_id}-Gviz-Trackplot.rds" \
 	"""
 	}
 
 
-// Agrgegated visualizations (from various transcripts)
+// Agrgegated visualisations (from various transcripts)
 
 // Aggregation Visualizaiton Ch (from CSV). First element is Event_ID, next are Transcript_IDs participating in the event
-viz_aggr_ch = Channel.fromPath(params.visualization.aggregation_csv).splitCsv(header: false).map { tuple ( it[0], it[1], it[2..-1]) }
+vis_aggr_ch = Channel.fromPath(params.visualisation.aggregation_csv).splitCsv(header: false).map { tuple ( it[0], it[1], it[2..-1]) }
 
-// Duplicate viz_ch to select GTF files and PFAM outputs independently
-visualization_aggr_ch.into { viz_gtf_ch ; viz_pfam_ch }
+// Duplicate vis_ch to select GTF files and PFAM outputs independently
+visualisation_aggr_ch.into { vis_gtf_ch ; vis_pfam_ch }
 
 // GTF Channel // Collect GTF Files
-viz_gtf_all_ch = viz_gtf_ch.map{ it[1] }.collect()
+vis_gtf_all_ch = vis_gtf_ch.map{ it[1] }.collect()
 
 // PFAM Gen-Coord Channel // Collect PFAM Genomic Coordinate Files 
-viz_pfam_all_ch = viz_pfam_ch.map{ it[2] }.collect()
+vis_pfam_all_ch = vis_pfam_ch.map{ it[2] }.collect()
 
 // Visualize AS Event // TODO: Control this process from config
-process visualization_event {
+process visualisation_event {
 	tag "Visualization AS Event $event_id"
 	
-	publishDir "${results_dir}/6.Visualization-Events", mode: 'copy',
+	publishDir "${results_dir}/6.Visualisation-Events", mode: 'copy',
 	    saveAs: {filename ->
 	    	if (filename.indexOf(".rds") > 0) "$filename"
 	    	else if (filename.indexOf(".pdf") > 0) "$filename"
@@ -271,12 +272,12 @@ process visualization_event {
 	// memory = 2.GB	
 	
 	when: 
-	params.viz & params.viz_event
+	params.vis & params.vis_event
 		
 	input:
-	set val(event_id), val(gene_id), val(transcript_ids) from viz_aggr_ch 
-	file ('gtf_path/*') from viz_gtf_all_ch	
-	file ('pfam_path/*') from viz_pfam_all_ch	
+	set val(event_id), val(gene_id), val(transcript_ids) from vis_aggr_ch 
+	file ('gtf_path/*') from vis_gtf_all_ch	
+	file ('pfam_path/*') from vis_pfam_all_ch	
 	
 	output:
 	file("*.rds")
@@ -285,15 +286,15 @@ process visualization_event {
 	script:
 	"""
        	module load R/3.6.1
-	Visualization-AS-Event.R \
+	Visualisation-AS-Event.R \
 		--transcript_ids "${transcript_ids}" \
 		--event_id "${event_id}" \
 		--gene_id "${gene_id}" \
 		--pfam_path "pfam_path/" \
 		--gtf_path "gtf_path" \
-		--cytoBand ${params.visualization.cytoBand_table} \
-		--viz_track_list "${gene_id}-${event_id}-Gviz-Trackplot.rds" \
-		--viz_track_plot "${gene_id}-${event_id}-Gviz-Trackplot.pdf" \
+		--cytoBand ${params.visualisation.cytoBand_table} \
+		--vis_track_list "${gene_id}-${event_id}-Gviz-Trackplot.rds" \
+		--vis_track_plot "${gene_id}-${event_id}-Gviz-Trackplot.pdf" \
 	"""
 }
 
