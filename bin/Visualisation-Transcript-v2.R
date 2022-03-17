@@ -2,6 +2,7 @@
 
 # Generate Visualizations of the Transcript Exon Model + PFAM alignment output with the Bioconductor GViz package
 # TODO: Extract transcript genomic coordinates from GTF and not from EnsmblDB for consistency
+## Vulnerabilities: This script works with Gencode GTF annotation. With the Ensembl GTF it will break
 
 suppressPackageStartupMessages(require("optparse"))
 
@@ -30,7 +31,7 @@ option_list = list(
   make_option(
     c("-c", "--cytoBand"),
     action = "store",
-    default = NA,
+    default = NULL,
     type = 'character',
     help = 'Path to the UCSC Browser Cyto Band table. To download cytoband files for genomes hosted at UCSC, see the UCSC Table Browser, and select Group="All Tables" and Table="cytoBand".'
   ), 
@@ -61,23 +62,26 @@ suppressPackageStartupMessages(require(dplyr))
 gene.track.v2 <- function(gen.coords, which, genome, group.id, plot.label){
   suppressPackageStartupMessages(require(Gviz))
   ## Generate gene region track (either the full model of transcript or its PFAM domains)
-  if(!which %in% c("transcript", "pfam")) steop(paste0("which arg must be one of: transcript or pfam", which, " not valid!" ))
+  if(!which %in% c("transcript", "pfam")) stop(paste0("which arg must be one of: transcript or pfam", which, " not valid!" ))
   if(which == "transcript"){
     feat <- as.character(tolower(gen.coords$type))
   } else if(which == "pfam"){
     feat <- group.id
   }
   chr <- unique(as.character(gen.coords[["seqnames"]]))
+  strand <- unique(as.character(gen.coords[["strand"]]))
+  #Track
   gene.track <- GeneRegionTrack(rstarts = gen.coords[["start"]],
                                 rends = gen.coords[["end"]],
                                 genome = genome,
                                 chromosome = chr,
+                                strand = strand,
                                 name = group.id, # grouping var (I think)
                                 symbol = plot.label, # plot label (I think)
-                                #feature = group.id, # for colouring purposes
                                 feature = feat, # distinguishes CDS from UTRs
                                 cex.axis = 15)
-  
+  # Edit dpars (to enable distinction btw CDS and UTR)
+  gene.track@dp@pars[["collapse"]] <- FALSE
   l <- list(gene.track)
   names(l) <- plot.label
   return(l)
@@ -112,7 +116,7 @@ parse.gtf.v2 <- function(gtf, transcript.id){
   transcript.model$exon <- transcript.model$exon_id
   transcript.model$transcript <- transcript.model$transcript.id
   transcript.model$gene <- transcript.model$gene_id
-  direction <- ifelse(transcript.model$strand == "+", ">", "<")
+  direction <- ifelse(transcript.model$strand == "+", "<", ">")
   transcript.model$symbol <- paste(transcript.model$transcript.id, direction) # label in plot
   return(transcript.model)
 }
@@ -155,7 +159,7 @@ genome.track.fun <- function(){
   list("Genome.Track" = gtrack)
 }
 
-save.plot.pdf <- function(track.list, plot.title, file.name){
+save.plot.pdf <- function(track.list, plot.title, file.name ){
   ## Save PDF plot
   pdf(file.name)
   # Plot
@@ -175,8 +179,8 @@ transcript_id <- opt$transcript_id
 out.rds.file.name <- opt$vis_track_list
 out.pdf.file.name <- opt$vis_track_plot
 pfam.gen.coords <- opt$pfam_genomic_coord
-## 0.2. Read Cytoband information from UCSC, required to generate the chromosome Ideogram without connection to the UCSC server
-cytoBand <- read.table(opt$cytoBand, header = T, sep = "\t") 
+## 0.3. Read Cytoband information from UCSC, required to generate the chromosome Ideogram without connection to the UCSC server
+if(!(is.null(opt$cytoBand))) { cytoBand <- read.table(opt$cytoBand, header = T, sep = "\t") }
 
 # 1. Transcript Model Track 
 ## 1.1. Read GTF
@@ -188,7 +192,7 @@ transcript.track <- gene.track.v2(gen.coords =  transcript_model,
                                        which = "transcript",
                                        genome = "hg38", # this is hard-coded to human genome
                                        group.id = "transcript", # for track labeling
-                                       plot.label = transcript_id) # for track labeling
+                                       plot.label = transcript_id ) # for track labeling
 
 
 # 2. PFAM alignment Tracks
@@ -215,7 +219,7 @@ pfam.track.list <- if (all(pfam.gc[["pfam_match"]]) == T ) {
     # Extract partiality labels
     partiality <- pfam.gc.gviz[pfam.gc.gviz[["pfam_alignment_id"]] == al.id, "partiality"]
     # Label
-    plot.label <- unique(paste0(coords.df[["domain_name"]], "-P=", round(partiality, 2)))
+    plot.label <- unique(paste0(coords.df[["domain_name"]], "(P=", round(partiality, 2), ")"))
     ## Tracks
     gene.track.v2(gen.coords = coords.df, 
                   which = "pfam", 

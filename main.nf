@@ -237,7 +237,7 @@ process visualisation_transcript {
 		--transcript_id  ${transcript_id} \
 		--pfam_genomic_coord ${pfam_al} \
 		--gtf ${transcript_gtf} \
-		--cytoBand ${params.visualisation.cytoBand_table} \
+		--cytoBand ${cyto_band} \
 		--vis_track_plot  "${transcript_id}-Gviz-Trackplot.pdf" \
 		--vis_track_list  "${transcript_id}-Gviz-Trackplot.rds" \
 	"""
@@ -284,6 +284,7 @@ process visualisation_event {
 	file("*.pdf")
 	
 	script:
+	def cyto_band = params.visualisation.cyto_band
 	"""
        	module load R/3.6.1
 	Visualisation-AS-Event.R \
@@ -292,7 +293,7 @@ process visualisation_event {
 		--gene_id "${gene_id}" \
 		--pfam_path "pfam_path/" \
 		--gtf_path "gtf_path" \
-		--cytoBand ${params.visualisation.cytoBand_table} \
+		--cytoBand ${cyto_band} \
 		--vis_track_list "${gene_id}-${event_id}-Gviz-Trackplot.rds" \
 		--vis_track_plot "${gene_id}-${event_id}-Gviz-Trackplot.pdf" \
 	"""
