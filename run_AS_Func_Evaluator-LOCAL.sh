@@ -17,4 +17,4 @@ nextflow run "${source_dir}/main.nf" \
         -with-timeline "${report_dir}/timeline.html" \
 	-with-dag "${report_dir}/flowchart.png" \
 	-profile local \
-	-resume pedantic_torvalds
+	-resume

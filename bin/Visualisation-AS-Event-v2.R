@@ -31,6 +31,20 @@ option_list = list(
     help = 'Gene ID (in HGNC Format) of the Alternative Splicing Event'
   ),
   make_option(
+    c("-s", "--genomic_start"),
+    action = "store",
+    default = NULL,
+    type = 'numeric',
+    help = 'Genomic Start coordinates of the Event to represent (Will not be represented if input is NULL)'
+  ), 
+  make_option(
+    c("-e", "--genomic_end"),
+    action = "store",
+    default = NULL,
+    type = 'numeric',
+    help = 'Genomic End coordinates of the Event to represent (Will not be represented if input is NULL)'
+  ), 
+  make_option(
     c("-p", "--pfam_path"),
     action = "store",
     default = NA,
@@ -180,6 +194,20 @@ genome.track.fun <- function(){
   list("Genome.Track" = gtrack)
 }
 
+event.track <- function(gen.start, gen.end, chr, gen){
+  # Generate Track with Coordinates of Aggregation Event
+  ev.track <- GeneRegionTrack(rstarts = gen.start,
+                              rends = gen.end,
+                              genome = gen,
+                              chromosome = chr,
+                              name = "event.track", 
+                              symbol = "Event Track",
+                              feature = "event.track",
+                              cex.axis = 15)
+  
+  list("Event.Track" = ev.track)
+}
+
 save.plot.pdf <- function(track.list, plot.title, file.name ){
   ## Save PDF plot
   pdf(file.name)
@@ -199,6 +227,8 @@ save.plot.pdf <- function(track.list, plot.title, file.name ){
 transcript_ids <- opt$transcript_ids
 gene_id <- opt$gene_id
 event_id <- opt$event_id
+genomic_start <- opt$genomic_start
+genomic_end <- opt$genomic_end
 ## 0.2 Input file paths
 pfam_path <- opt$pfam_path
 gtf_path <- opt$gtf_path
@@ -301,6 +331,12 @@ genome.track <- genome.track.fun()
 chr <- unique(unlist(lapply(transcript.pfam.track.list, function(track) track@chromosome)))
 if(length(chr) > 1 | is.na(chr)) { warning(paste0("The transcripts provided ", transcript_ids, " belong to more than one chromosome"))}
 chr.track <- chr.track.fun(genome = "hg38", chr = chr, cyto.band = cytoBand)
+## 5.3.  Event Track (if coordinates available)
+if(is.numeric(genomic_start) | is.numeric(genomic_end)) { 
+  event.track <- event.track(gen.start = genomic_start, gen.end = genomic_end, chr = chr, gen = "hg38") 
+}else{
+  event.track <- list(NULL)
+}
 
 # 6. Collect Tracks 
 track.list <- c(chr.track,

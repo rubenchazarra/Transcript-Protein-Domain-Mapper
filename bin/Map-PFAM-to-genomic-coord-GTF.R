@@ -6,7 +6,7 @@
 ## Note: The 'cds_ok' column in the output depicts if there is a coincidence between the pfam genomic coordinates and the length of the transcript CDS 
 ######## This is the only thing for which we need the protein CDS sequence so we could potentially remove this
 
-suppressPackageStartupMessages(require(optparse))
+suppressPackageStartupMessages(require("optparse"))
 
 option_list = list(
   make_option(

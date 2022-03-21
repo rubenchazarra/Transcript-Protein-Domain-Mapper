@@ -173,7 +173,7 @@ save.plot.pdf <- function(track.list, plot.title, file.name ){
 }
 
 # 0. Params
-## 0.1. Transcript ID
+## 0.1. 
 transcript_id <- opt$transcript_id
 ## 0.2. Output file names
 out.rds.file.name <- opt$vis_track_list
