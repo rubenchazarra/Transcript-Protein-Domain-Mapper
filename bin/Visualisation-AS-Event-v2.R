@@ -38,7 +38,7 @@ option_list = list(
     help = 'Genomic Start coordinates of the Event to represent (Will not be represented if input is NULL)'
   ), 
   make_option(
-    c("-e", "--genomic_end"),
+    c("-n", "--genomic_end"),
     action = "store",
     default = NULL,
     type = 'numeric',
@@ -183,7 +183,7 @@ chr.track.fun <- function(genome, chr, cyto.band ){
   itrack <- IdeogramTrack(genome = genome,
                           chromosome = chr,
                           bands = cyto.band,
-                          name = "chr.track")
+                          name = chr)
   list("Chr.track" = itrack)
 }
 
@@ -194,7 +194,7 @@ genome.track.fun <- function(){
   list("Genome.Track" = gtrack)
 }
 
-event.track <- function(gen.start, gen.end, chr, gen){
+event.track.fun <- function(gen.start, gen.end, chr, gen){
   # Generate Track with Coordinates of Aggregation Event
   ev.track <- GeneRegionTrack(rstarts = gen.start,
                               rends = gen.end,
@@ -227,8 +227,8 @@ save.plot.pdf <- function(track.list, plot.title, file.name ){
 transcript_ids <- opt$transcript_ids
 gene_id <- opt$gene_id
 event_id <- opt$event_id
-genomic_start <- opt$genomic_start
-genomic_end <- opt$genomic_end
+genomic_start <- as.numeric(opt$genomic_start)
+genomic_end <- as.numeric(opt$genomic_end)
 ## 0.2 Input file paths
 pfam_path <- opt$pfam_path
 gtf_path <- opt$gtf_path
@@ -332,8 +332,9 @@ chr <- unique(unlist(lapply(transcript.pfam.track.list, function(track) track@ch
 if(length(chr) > 1 | is.na(chr)) { warning(paste0("The transcripts provided ", transcript_ids, " belong to more than one chromosome"))}
 chr.track <- chr.track.fun(genome = "hg38", chr = chr, cyto.band = cytoBand)
 ## 5.3.  Event Track (if coordinates available)
-if(is.numeric(genomic_start) | is.numeric(genomic_end)) { 
-  event.track <- event.track(gen.start = genomic_start, gen.end = genomic_end, chr = chr, gen = "hg38") 
+if(is.numeric(genomic_start) | is.numeric(genomic_end)) {
+  
+event.track <- event.track.fun(gen.start = genomic_start, gen.end = genomic_end, chr = chr, gen = "hg38")
 }else{
   event.track <- list(NULL)
 }
@@ -341,8 +342,9 @@ if(is.numeric(genomic_start) | is.numeric(genomic_end)) {
 # 6. Collect Tracks 
 track.list <- c(chr.track,
                 genome.track,
+                event.track,
                 transcript.pfam.track.list
-)
+	)
 
 # 7. Save
 ## 7.1. Save track list
