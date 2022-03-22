@@ -10,6 +10,7 @@
 outdir = params.outdir
 tag = params.tag
 results_dir = "${outdir}/${tag}/"
+r_module_load = params.r_module_load
 
 // Input files
 // 1) GTF Annotation file
@@ -28,7 +29,7 @@ process get_cds_translate {
 	tag "Get CDS $transcript_id"
 	
 	publishDir "${results_dir}", mode: 'copy',
-	    saveAs: { filename ->
+	           saveAs: { filename ->
 	    	if (filename == "${transcript_id}.fasta") "1.CDS-Fasta/$filename"
 	    	else if (filename == "${transcript_id}.protein.fasta") "2.Protein-Fasta/$filename"
 	    	else if (filename.indexOf(".gtf") > 0) "0.Transcript-GTF/$filename"
@@ -108,7 +109,7 @@ process parse_pfam {
 	
 	script:
 	"""
-	module load R/3.6.1
+	${r_module_load}
 	Hmmscan-dmtblout-Parser.R \
 		--hmmscan_tbl ${pfam_al} \
 		--rhmmer_path ${baseDir}/bin/rhmmer.R \
@@ -134,7 +135,7 @@ process merge_pfam {
 	file("PFAM-DomTblOut-CSV-Merged.txt") 
 	script:
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Merge-tables.R \
 		--input_tables pfam/ \
 		--output_df "PFAM-DomTblOut-CSV-Merged.txt"
@@ -159,7 +160,7 @@ process map_genomic_coord_ens {
 	
 	script:
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Map-PFAM-to-genomic-coord-EnsemblDB.R \
 		--pfam_al ${pfam_al} \
 		--gtf ${transcript_gtf} \
@@ -190,7 +191,7 @@ process map_genomic_coord_gtf {
 	
 	script:
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Map-PFAM-to-genomic-coord-GTF.R \
 		--pfam_al ${pfam_al} \
 		--gtf ${transcript_gtf} \
@@ -225,7 +226,7 @@ process visualisation_transcript {
 	script:
 	def cyto_band = params.visualisation.cyto_band	
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Visualisation-Transcript-v2.R \
 		--transcript_id  ${transcript_id} \
 		--pfam_genomic_coord ${pfam_al} \
@@ -278,7 +279,7 @@ process visualisation_event {
 	script:
 	def cyto_band = params.visualisation.cyto_band
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Visualisation-AS-Event-v2.R \
 		--transcript_ids "${transcript_ids}" \
 		--event_id "${event_id}" \
@@ -311,7 +312,7 @@ process merge_gencoords_GTF {
 	file("PFAM-GenCoords-GTF-Merged.txt") 
 	script:
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Merge-tables.R \
 		--input_tables genomic-coord-pfam/ \
 		--output_df "PFAM-GenCoords-GTF-Merged.txt"
@@ -336,7 +337,7 @@ process merge_gencoords_EnsDB {
 	
 	script:
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Merge-tables.R \
 		--input_tables genomic-coord-pfam/ \
 		--output_df "PFAM-GenCoords-EnsemblDB-Merged.txt"
