@@ -3,7 +3,7 @@
 ## Script to map PFAM domain alignment coordinates to genomic coordinates.
 ## Note: edbx object is hardcoded to Human database
 
-suppressPackageStartupMessages(require(optparse))
+suppressPackageStartupMessages(require("optparse"))
 
 option_list = list(
   make_option(

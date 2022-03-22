@@ -1,15 +1,16 @@
-#!/apps/NEXTFLOW/21.04.1/ nextflow
+//#!/apps/NEXTFLOW/21.04.1/ nextflow
 
 // Transcript Protein Domain Mapper ||  Developed by Ruben Chazarra-Gil (https://github.com/rubenchazarra)
 
-// Inputs of the pipeline: i) list of protein coding transcript ids, ii) AS event visualization aggregation file || Additinal files required: i) Annotation GTF file, ii) Genome.fasta, iii) Local installation of PFAM database, iv) UCSC Cytoband file for visualization
+// Inputs of the pipeline: i) list of protein coding transcript ids, ii) AS event visualisation aggregation file || Additinal files required: i) Annotation GTF file, ii) Genome.fasta, iii) Local installation of PFAM database, iv) UCSC Cytoband file for visualisation
 
-// Pipeline: for each input transcript, we extract its coding sequence and translated it. With the protein sequence we query the PFAM protein domain database. The PFAM alignment relative coordinates are converted to genomic coordinates to enable visualization of the transcript models together with their PFAM hits.
+// Pipeline: for each input transcript, we extract its coding sequence and translated it. With the protein sequence we query the PFAM protein domain database. The PFAM alignment relative coordinates are converted to genomic coordinates to enable visualisation of the transcript models together with their PFAM hits.
 
 // Params
 outdir = params.outdir
 tag = params.tag
 results_dir = "${outdir}/${tag}/"
+r_module_load = params.r_module_load
 
 // Input files
 // 1) GTF Annotation file
@@ -28,14 +29,13 @@ process get_cds_translate {
 	tag "Get CDS $transcript_id"
 	
 	publishDir "${results_dir}", mode: 'copy',
-	    saveAs: { filename ->
+	           saveAs: { filename ->
 	    	if (filename == "${transcript_id}.fasta") "1.CDS-Fasta/$filename"
 	    	else if (filename == "${transcript_id}.protein.fasta") "2.Protein-Fasta/$filename"
 	    	else if (filename.indexOf(".gtf") > 0) "0.Transcript-GTF/$filename"
 	    }
 	
 	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	// memory = 2.GB	
 	
 	input:
 	set val(transcript_id), file(genome), file(gtf) from data_ch	
@@ -66,7 +66,6 @@ process pfam {
 	    }
 	
 	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	// memory = 2.GB	
 	
 	input:
 	set val(transcript_id), file(transcript_gtf), file(protein_fasta) from pfam_ch	
@@ -95,13 +94,12 @@ process pfam {
 process parse_pfam {
 	tag "Parse PFAM $transcript_id"
 	
-	publishDir "${results_dir}/4.PFAM-DmTblOut-CSV", mode: 'copy',
+	publishDir "${results_dir}/4.PFAM-DomTblOut-CSV", mode: 'copy',
 	    saveAs: {filename ->
 	    	if (filename.indexOf(".txt") > 0) "$filename"
 	    }
 	
 	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	// memory = 2.GB	
 	
 	input:
 	set val(transcript_id), file(transcript_gtf), file(pfam_al) from pfam_parse_ch	
@@ -111,7 +109,7 @@ process parse_pfam {
 	
 	script:
 	"""
-	module load R/3.6.1
+	${r_module_load}
 	Hmmscan-dmtblout-Parser.R \
 		--hmmscan_tbl ${pfam_al} \
 		--rhmmer_path ${baseDir}/bin/rhmmer.R \
@@ -129,7 +127,6 @@ process merge_pfam {
 	publishDir "${results_dir}/4.PFAM-DomTblOut-CSV-Merged/",  mode: 'copy'
 	
 	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	// memory = 2.GB	
 	
 	input:
 	file("pfam/") from merge_pfam_al_ch
@@ -138,7 +135,7 @@ process merge_pfam {
 	file("PFAM-DomTblOut-CSV-Merged.txt") 
 	script:
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Merge-tables.R \
 		--input_tables pfam/ \
 		--output_df "PFAM-DomTblOut-CSV-Merged.txt"
@@ -155,7 +152,6 @@ process map_genomic_coord_ens {
 	    }
 	
 	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	// memory = 2.GB	
 	
 	input:
 	set val(transcript_id), file(transcript_gtf), file(pfam_al) from pfam_genomic_coord_ens_ch
@@ -164,7 +160,7 @@ process map_genomic_coord_ens {
 	
 	script:
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Map-PFAM-to-genomic-coord-EnsemblDB.R \
 		--pfam_al ${pfam_al} \
 		--gtf ${transcript_gtf} \
@@ -186,17 +182,16 @@ process map_genomic_coord_gtf {
 	    }
 	
 	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	// memory = 2.GB	
 	
 	input:
 	set val(transcript_id), file(transcript_gtf), file(pfam_al), file(protein_fasta) from pfam_genomic_coord_gtf_ch
 	
 	output:
-	set val(transcript_id), file(transcript_gtf), file("${transcript_id}-PFAM-GenCoords-GTF.txt") into merge_gcoords_pfam_ch, visualization_transcript_ch, visualization_aggr_ch 
+	set val(transcript_id), file(transcript_gtf), file("${transcript_id}-PFAM-GenCoords-GTF.txt") into merge_gcoords_pfam_ch, visualisation_transcript_ch, visualisation_aggr_ch 
 	
 	script:
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Map-PFAM-to-genomic-coord-GTF.R \
 		--pfam_al ${pfam_al} \
 		--gtf ${transcript_gtf} \
@@ -207,93 +202,95 @@ process map_genomic_coord_gtf {
 	}
 
 // Visualize Transcript Model + PFAM alignment
-process visualization_transcript {
+process visualisation_transcript {
 	tag "Visualize PFAM alignment $transcript_id"
 	
-	publishDir "${results_dir}/6.Visualization-Transcript", mode: 'copy',
+	publishDir "${results_dir}/6.Visualisation-Transcript", mode: 'copy',
 	    saveAs: {filename ->
 	    	if (filename.indexOf(".rds") > 0) "$filename"
 	    	else if (filename.indexOf(".pdf") > 0) "$filename"
 	    }
 	
 	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	// memory = 2.GB	
 	
 	when:
-	params.viz & params.viz_transcript
+	params.vis & params.vis_transcript
 		
 	input:
-	set val(transcript_id), file(transcript_gtf_file), file(pfam_al) from visualization_transcript_ch
+	set val(transcript_id), file(transcript_gtf), file(pfam_al) from visualisation_transcript_ch
 	
 	output:
 	file("*.rds")
 	file("*.pdf")
 	
 	script:
+	def cyto_band = params.visualisation.cyto_band	
 	"""
-       	module load R/3.6.1
-	Visualization-Transcript.R \
+	${r_module_load}
+	Visualisation-Transcript-v2.R \
 		--transcript_id  ${transcript_id} \
 		--pfam_genomic_coord ${pfam_al} \
-		--gtf ${transcript_gtf_file} \
-		--cytoBand ${params.visualization.cytoBand_table} \
-		--viz_track_plot  "${transcript_id}-Gviz-Trackplot.pdf" \
-		--viz_track_list  "${transcript_id}-Gviz-Trackplot.rds" \
+		--gtf ${transcript_gtf} \
+		--cytoBand ${cyto_band} \
+		--vis_track_plot  "${transcript_id}_Gviz_Trackplot.pdf" \
+		--vis_track_list  "${transcript_id}_Gviz_Trackplot.rds" \
 	"""
 	}
 
 
-// Agrgegated visualizations (from various transcripts)
+// Agrgegated visualisations (from various transcripts)
 
-// Aggregation Visualizaiton Ch (from CSV). First element is Event_ID, next are Transcript_IDs participating in the event
-viz_aggr_ch = Channel.fromPath(params.visualization.aggregation_csv).splitCsv(header: false).map { tuple ( it[0], it[1], it[2..-1]) }
+// Aggregation Visualizaiton Ch (from CSV). Columns are: event_id, gene_name, genomic_start. genomic_end, transcript_ids
+vis_aggr_ch = Channel.fromPath(params.visualisation.aggregation_csv).splitCsv(header: false).map { tuple ( it[0], it[1], it[2], it[3], it[4..-1]) }
 
-// Duplicate viz_ch to select GTF files and PFAM outputs independently
-visualization_aggr_ch.into { viz_gtf_ch ; viz_pfam_ch }
+// Duplicate vis_ch to select GTF files and PFAM outputs independently
+visualisation_aggr_ch.into { vis_gtf_ch ; vis_pfam_ch }
 
 // GTF Channel // Collect GTF Files
-viz_gtf_all_ch = viz_gtf_ch.map{ it[1] }.collect()
+vis_gtf_all_ch = vis_gtf_ch.map{ it[1] }.collect()
 
 // PFAM Gen-Coord Channel // Collect PFAM Genomic Coordinate Files 
-viz_pfam_all_ch = viz_pfam_ch.map{ it[2] }.collect()
+vis_pfam_all_ch = vis_pfam_ch.map{ it[2] }.collect()
 
 // Visualize AS Event // TODO: Control this process from config
-process visualization_event {
+process visualisation_event {
 	tag "Visualization AS Event $event_id"
 	
-	publishDir "${results_dir}/6.Visualization-Events", mode: 'copy',
+	publishDir "${results_dir}/6.Visualisation-Events", mode: 'copy',
 	    saveAs: {filename ->
 	    	if (filename.indexOf(".rds") > 0) "$filename"
 	    	else if (filename.indexOf(".pdf") > 0) "$filename"
 	    }
 	
 	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	// memory = 2.GB	
 	
 	when: 
-	params.viz & params.viz_event
+	params.vis & params.vis_event
 		
 	input:
-	set val(event_id), val(gene_id), val(transcript_ids) from viz_aggr_ch 
-	file ('gtf_path/*') from viz_gtf_all_ch	
-	file ('pfam_path/*') from viz_pfam_all_ch	
+	set val(event_id), val(gene_id), val(gen_start), val(gen_end), val(transcript_ids) from vis_aggr_ch 
+	file ('gtf_path/*') from vis_gtf_all_ch
+	file ('pfam_path/*') from vis_pfam_all_ch
 	
 	output:
 	file("*.rds")
 	file("*.pdf")
 	
 	script:
+	def cyto_band = params.visualisation.cyto_band
 	"""
-       	module load R/3.6.1
-	Visualization-AS-Event.R \
+	${r_module_load}
+	Visualisation-AS-Event-v2.R \
 		--transcript_ids "${transcript_ids}" \
 		--event_id "${event_id}" \
+		--genomic_start "${gen_start}" \
+		--genomic_end "${gen_end}" \
 		--gene_id "${gene_id}" \
 		--pfam_path "pfam_path/" \
-		--gtf_path "gtf_path" \
-		--cytoBand ${params.visualization.cytoBand_table} \
-		--viz_track_list "${gene_id}-${event_id}-Gviz-Trackplot.rds" \
-		--viz_track_plot "${gene_id}-${event_id}-Gviz-Trackplot.pdf" \
+		--gtf_path "gtf_path/" \
+		--cytoBand ${cyto_band} \
+		--vis_track_list "${gene_id}_${event_id}_Gviz-Trackplot.rds" \
+		--vis_track_plot "${gene_id}_${event_id}_Gviz-Trackplot.pdf" \
 	"""
 }
 
@@ -307,7 +304,6 @@ process merge_gencoords_GTF {
 	publishDir "${results_dir}/5.PFAM-GenCoords-GTF-Merged/",  mode: 'copy'
 	
 	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	// memory = 2.GB	
 	
 	input:
 	file("genomic-coord-pfam/") from merge_gcoords_gtf_ch
@@ -316,7 +312,7 @@ process merge_gencoords_GTF {
 	file("PFAM-GenCoords-GTF-Merged.txt") 
 	script:
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Merge-tables.R \
 		--input_tables genomic-coord-pfam/ \
 		--output_df "PFAM-GenCoords-GTF-Merged.txt"
@@ -332,7 +328,6 @@ process merge_gencoords_EnsDB {
 	publishDir "${results_dir}/5.PFAM-GenCoords-EnsemblDB-Merged/",  mode: 'copy'
 	
 	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	// memory = 2.GB	
 	
 	input:
 	file("genomic-coord-pfam/") from merge_gcoords_ens_ch
@@ -342,7 +337,7 @@ process merge_gencoords_EnsDB {
 	
 	script:
 	"""
-       	module load R/3.6.1
+	${r_module_load}
 	Merge-tables.R \
 		--input_tables genomic-coord-pfam/ \
 		--output_df "PFAM-GenCoords-EnsemblDB-Merged.txt"

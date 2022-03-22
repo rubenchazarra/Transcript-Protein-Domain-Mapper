@@ -3,7 +3,7 @@
 # Pre process Alternative Splicing (AS) input files
 ## Output various things: i) df with functional concordance, ii) df with no-functional concordance, iii) list of unique transcript ids for PFAM query
 
-suppressPackageStartupMessages(library("optparse"))
+suppressPackageStartupMessages(require(optparse))
 
 option_list = list(
   make_option(

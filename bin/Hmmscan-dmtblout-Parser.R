@@ -39,10 +39,7 @@ option_list = list(
 opt <- parse_args(OptionParser(option_list=option_list))
 
 
-# 1) rhmmer (CRAN) functions
-#utils::globalVariables(c("%>%", "."))
 suppressPackageStartupMessages(require(magrittr))
-source(opt$rhmmer_path) # Edit in pipeline
 
 # 2) Coerce tbl to df
 tbl.to.df <- function(tb, transcript_id){
@@ -66,17 +63,18 @@ tbl.to.df <- function(tb, transcript_id){
 frac.alig.domain <- function(df){
   ## Calculate the fraction of AA of the HMM model spanned by the PFAM alignment
   ## This is to address Partiality in PFAM alignments. Based on the idea that an alignment of the query sequence (or a part of the query sequence) against 100% of the PFAM domain can be considered a functional domain. Whereas an alignment of 30% of the domain, can't.
-  df[["frac_al_domain"]] = (df$ali_to + 1 - df$ali_from)/df$domain_len
+  df[["partiality"]] = (df[["hmm_to"]] + 1 - df[["hmm_from"]])/df[["domain_len"]]
   return(df)
 }
 
 ## RUN ## 
-
+# 0. rhmmer (CRAN) functions
+source(opt$rhmmer_path)
 # 1. Parser HMMScan Output Table
 hmmscan.tb <- read_domtblout(opt$hmmscan_tbl)
 # 2. Coerce to df
 hmmscan.df <- tbl.to.df(hmmscan.tb, transcript_id = opt$transcript_id)
-# 3. Add fraction of alignment - NOT NOW  
-# hmmscan.df <- frac.alig.domain(df)
+# 3. Add fraction of alignment
+hmmscan.df <- frac.alig.domain(hmmscan.df)
 # 4. Save TSV
 write.table(hmmscan.df, file = opt$output_table, quote = F, sep = "\t")
