@@ -29,6 +29,13 @@ option_list = list(
     help = 'Path to GTF annotation file.'
   ), 
   make_option(
+    c("-a", "--genome_id"),
+    action = "store",
+    default = "hg38",
+    type = 'character',
+    help = 'UCSC Genome Browser assembly ID. Latest IDs for Human and Mouse genomes are "hg38", and "mm39" respectively'
+  ), 
+  make_option(
     c("-c", "--cytoBand"),
     action = "store",
     default = NULL,
@@ -175,6 +182,7 @@ save.plot.pdf <- function(track.list, plot.title, file.name ){
 # 0. Params
 ## 0.1. 
 transcript_id <- opt$transcript_id
+genome_id <- opt$genome_id
 ## 0.2. Output file names
 out.rds.file.name <- opt$vis_track_list
 out.pdf.file.name <- opt$vis_track_plot
@@ -190,7 +198,7 @@ transcript_model <- parse.gtf.v2(gtf = gtf, transcript.id = transcript_id )
 ## 1.3. Read GTF
 transcript.track <- gene.track.v2(gen.coords =  transcript_model, 
                                        which = "transcript",
-                                       genome = "hg38", # this is hard-coded to human genome
+                                       genome = genome_id, # this is hard-coded to human genome
                                        group.id = "transcript", # for track labeling
                                        plot.label = transcript_id ) # for track labeling
 
@@ -223,7 +231,7 @@ pfam.track.list <- if (all(pfam.gc[["pfam_match"]]) == T ) {
     ## Tracks
     gene.track.v2(gen.coords = coords.df, 
                   which = "pfam", 
-                  genome = "hg38", 
+                  genome = genome_id, 
                   group.id = "pfam", 
                   plot.label = plot.label)
   })
@@ -236,7 +244,7 @@ pfam.track.list <- if (all(pfam.gc[["pfam_match"]]) == T ) {
 genome.track <- genome.track.fun()
 ## 3.2. Chromosome Track
 chr <- as.character(unique(pfam.gc$seqnames)[!is.na(unique(pfam.gc$seqnames))]) # skip NAs if there are
-chr.track <- chr.track.fun(genome = "hg38", chr = chr, cyto.band = cytoBand)
+chr.track <- chr.track.fun(genome = genome_id, chr = chr, cyto.band = cytoBand)
 
 # 4. Collect Tracks 
 track.list <- c(chr.track,

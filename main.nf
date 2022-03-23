@@ -187,7 +187,7 @@ process map_genomic_coord_gtf {
 	set val(transcript_id), file(transcript_gtf), file(pfam_al), file(protein_fasta) from pfam_genomic_coord_gtf_ch
 	
 	output:
-	set val(transcript_id), file(transcript_gtf), file("${transcript_id}-PFAM-GenCoords-GTF.txt") into merge_gcoords_pfam_ch, visualisation_transcript_ch, visualisation_aggr_ch 
+	set val(transcript_id), file(transcript_gtf), file("${transcript_id}-PFAM-GenCoords-GTF.txt") into merge_gcoords_pfam_ch, vis_transcript_ch, vis_aggr_ch
 	
 	script:
 	"""
@@ -217,7 +217,7 @@ process visualisation_transcript {
 	params.vis & params.vis_transcript
 		
 	input:
-	set val(transcript_id), file(transcript_gtf), file(pfam_al) from visualisation_transcript_ch
+	set val(transcript_id), file(transcript_gtf), file(pfam_al) from vis_transcript_ch
 	
 	output:
 	file("*.rds")
@@ -225,12 +225,14 @@ process visualisation_transcript {
 	
 	script:
 	def cyto_band = params.visualisation.cyto_band	
+	def genome_id = params.visualisation.cyto_band	
 	"""
 	${r_module_load}
 	Visualisation-Transcript-v2.R \
 		--transcript_id  ${transcript_id} \
 		--pfam_genomic_coord ${pfam_al} \
 		--gtf ${transcript_gtf} \
+		--genome_id {genome_id} \
 		--cytoBand ${cyto_band} \
 		--vis_track_plot  "${transcript_id}_Gviz_Trackplot.pdf" \
 		--vis_track_list  "${transcript_id}_Gviz_Trackplot.rds" \
@@ -241,10 +243,10 @@ process visualisation_transcript {
 // Agrgegated visualisations (from various transcripts)
 
 // Aggregation Visualizaiton Ch (from CSV). Columns are: event_id, gene_name, genomic_start. genomic_end, transcript_ids
-vis_aggr_ch = Channel.fromPath(params.visualisation.aggregation_csv).splitCsv(header: false).map { tuple ( it[0], it[1], it[2], it[3], it[4..-1]) }
+vis_aggr_file_ch = Channel.fromPath(params.visualisation.aggregation_csv).splitCsv(header: false).map { tuple ( it[0], it[1], it[2], it[3], it[4..-1]) }
 
 // Duplicate vis_ch to select GTF files and PFAM outputs independently
-visualisation_aggr_ch.into { vis_gtf_ch ; vis_pfam_ch }
+vis_aggr_ch.into { vis_gtf_ch ; vis_pfam_ch }
 
 // GTF Channel // Collect GTF Files
 vis_gtf_all_ch = vis_gtf_ch.map{ it[1] }.collect()
@@ -268,7 +270,7 @@ process visualisation_event {
 	params.vis & params.vis_event
 		
 	input:
-	set val(event_id), val(gene_id), val(gen_start), val(gen_end), val(transcript_ids) from vis_aggr_ch 
+	set val(event_id), val(gene_id), val(gen_start), val(gen_end), val(transcript_ids) from vis_aggr_file_ch 
 	file ('gtf_path/*') from vis_gtf_all_ch
 	file ('pfam_path/*') from vis_pfam_all_ch
 	
@@ -278,6 +280,7 @@ process visualisation_event {
 	
 	script:
 	def cyto_band = params.visualisation.cyto_band
+	def genome_id = params.visualisation.genome_id	
 	"""
 	${r_module_load}
 	Visualisation-AS-Event-v2.R \
@@ -286,6 +289,7 @@ process visualisation_event {
 		--genomic_start "${gen_start}" \
 		--genomic_end "${gen_end}" \
 		--gene_id "${gene_id}" \
+		--genome_id {genome_id} \
 		--pfam_path "pfam_path/" \
 		--gtf_path "gtf_path/" \
 		--cytoBand ${cyto_band} \

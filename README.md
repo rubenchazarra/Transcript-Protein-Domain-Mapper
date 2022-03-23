@@ -1,6 +1,6 @@
 ## Transcript Protein Domain Mapper 
 
-Method for retrieving and visualising the protein domains of any protein coding isoform. 
+Method for retrieving and visualising the protein domains of any protein coding isoform of different genomes. 
 
 This method extracts the coding sequence (CDS) of any protein coding isoform, and maps it to the protein domain family database [PFAM](http://pfam.xfam.org/). In addition, it outputs a visualisation of the transcript genomic structure together with its corresponding domains. It also enables a joint visualisation of different transcripts which may represent an alternative splicing event. The pipeline is based in [Nextflow](https://www.nextflow.io/), a bioinformatics workflowflow schedueler.
 
@@ -13,6 +13,8 @@ The input files to the method must be specified in the configuration file `nextf
 * GTF annotation file  (`params.gtf`)
 * List of transcript IDs (`params.transcript_list`): Isoform nomenclature must match that one present in the GTF annotation file. An example of input transcript list can be seen in `test_data/transcript_list.txt`.
 * Genome fasta file (`params.genome`)
+
+**Note** Transcript IDs must match those in the GTF annotation file. Also, the versions of the GTF and the Genome Fasta file should be the same.
 
 ### Description of the method
 
@@ -78,13 +80,15 @@ A pipeline can be tuned by editting a series of parameters in the `nextflow.conf
 
 - To **enable the visualisation steps**, we must specify `params.vis = true`. There are two visualisation steps: the first one generates the transcript model with the corresponding mapped domains (`params.vis_transcript = true`); the second one generates an aggregated visualisation including multiple transcripts ( `params.vis_transcript = false`).
 
-- The **aggregated visualisation step** requires the addition of an aggregation file specifying the transcripts involved. The example aggregation file should look like
+- The **aggregated visualisation step** requires the addition of an aggregation file specifying the transcripts involved. The example aggregation file should look like:
 ```
 ENSG00000158122.11;SE:chr9:96641886-96645893:96646024-96651390:-,PRXL2C,96645893,96646024,ENST00000375234.7,ENST00000411939.5
 ```
 - Where the 1st element is the Alternative Splicing Event identifyer (can be any id really), the 2nd element is the gene name, 3rd and 4rth elements are the event coordinates (if not available, we can substitute this numeric values with NULL), and the last elements would be the transcripts implicated in the Alternative Splicing Event. Here you can find an [example aggregation file](tes_data/aggr.csv)
 
-- Finally, If the **visualisation step is enabled**, and in order to include a chromosome diagram in the plot, you should add to the `params.vis.cyto_band` parameter, the table describing the positions of cytogenetic bands wfor each chromosomes. This file can be downloaded [here](https://genome.ucsc.edu/cgi-bin/hgTables?db=hg38&hgta_group=map&hgta_track=cytoBand&hgta_table=cytoBand&hgta_doSchema=describe+table+schema).
+- If the **visualisation step is enabled**, and in order to include a chromosome diagram in the plot, you should add to the `params.vis.cyto_band` parameter, the table describing the positions of cytogenetic bands wfor each chromosomes. This file can be downloaded [here](https://genome.ucsc.edu/cgi-bin/hgTables?hgsid=1311491459_VyO06ty4dMBWFIL998ysQ9Q4AJld&clade=mammal&org=Mouse&db=mm10&hgta_group=map&hgta_track=cytoBand&hgta_table=cytoBand&hgta_regionType=genome&position=&hgta_outputType=primaryTable&hgta_outFileName=) for different species and genome versions.
+
+- The genome version id used must be specified in the `params.visualisation.genome_id` parameter. The genome version ids can be checked [here](https://genome.ucsc.edu/FAQ/FAQreleases.html) 
 
 ### Running the pipeline
 
@@ -95,11 +99,11 @@ The pipeline can be run directly from the commandline as:
 Preferably, you can launch the **Local or Slurm executables**. These contain additional execution parameters (which enable generation of nextflow reports, collection of execution metadata, or resuming previous executions).
 
 Local: 
-`./run_AS_Func_Evaluator-LOCAL.sh`
+`./run-Prot-Dom-Mapper-LOCAL.sh`
 
 If your infrastructure uses [Slurm](https://slurm.schedmd.com/) workload manager, you can launch the pipeline as: 
 
-`sbatch ./run_AS_Func_Evaluator-SLURM.sh`
+`sbatch run-Prot-Dom-Mapper-SLURM.sh`
 
 
 ### Visualisation examples

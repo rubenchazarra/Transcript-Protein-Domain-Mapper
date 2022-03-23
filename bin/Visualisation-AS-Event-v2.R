@@ -45,6 +45,13 @@ option_list = list(
     help = 'Genomic End coordinates of the Event to represent (Will not be represented if input is NULL)'
   ), 
   make_option(
+    c("-a", "--genome_id"),
+    action = "store",
+    default = "hg38",
+    type = 'character',
+    help = 'UCSC Genome Browser assembly ID. Latest IDs for Human and Mouse genomes are "hg38", and "mm39" respectively'
+  ),
+  make_option(
     c("-p", "--pfam_path"),
     action = "store",
     default = NA,
@@ -225,6 +232,7 @@ save.plot.pdf <- function(track.list, plot.title, file.name ){
 # 0. Params
 ## 0.1. Input params
 transcript_ids <- opt$transcript_ids
+genome_id <- opt$genome_id
 gene_id <- opt$gene_id
 event_id <- opt$event_id
 genomic_start <- as.numeric(opt$genomic_start) # If not numeric(no event coords provided), will return NAs
@@ -262,7 +270,7 @@ transcript.track.list <- lapply(transcript_ids, function(transcript_id){
   ## 1.3. Read GTF
   transcript.track <- gene.track.v2(gen.coords =  transcript_model, 
                                     which = "transcript",
-                                    genome = "hg38", # this is hard-coded to human genome
+                                    genome = genome_id, # this is hard-coded to human genome
                                     group.id = "transcript", # for track labeling
                                     plot.label = transcript_id ) # for track labeling
 })
@@ -308,7 +316,7 @@ pfam.track.list <- lapply(transcript_ids, function(transcript_id){
       ## Tracks
       gene.track.v2(gen.coords = coords.df, 
                     which = "pfam", 
-                    genome = "hg38", 
+                    genome = genome_id, 
                     group.id = "pfam", 
                     plot.label = plot.label)
     })
@@ -330,12 +338,12 @@ genome.track <- genome.track.fun()
 ## 5.2. Chromosome Track
 chr <- unique(unlist(lapply(transcript.pfam.track.list, function(track) track@chromosome)))
 if(length(chr) > 1 | is.na(chr)) { warning(paste0("The transcripts provided ", transcript_ids, " belong to more than one chromosome"))}
-chr.track <- chr.track.fun(genome = "hg38", chr = chr, cyto.band = cytoBand)
+chr.track <- chr.track.fun(genome = genome_id, chr = chr, cyto.band = cytoBand)
 ## 5.3.  Event Track (if coordinates available)
 if(is.na(genomic_start) | is.na(genomic_end)) {
 	event.track <- list(NULL)
 	}else{
-	event.track <- event.track.fun(gen.start = genomic_start, gen.end = genomic_end, chr = chr, gen = "hg38")
+	event.track <- event.track.fun(gen.start = genomic_start, gen.end = genomic_end, chr = chr, gen = genome_id)
 }
 
 # 6. Collect Tracks 
