@@ -242,8 +242,18 @@ process visualisation_transcript {
 
 // Agrgegated visualisations (from various transcripts)
 
-// Aggregation Visualizaiton Ch (from CSV). Columns are: event_id, gene_name, genomic_start. genomic_end, transcript_ids
-vis_aggr_file_ch = Channel.fromPath(params.visualisation.aggregation_csv).splitCsv(header: false).map { tuple ( it[0], it[1], it[2], it[3], it[4..-1]) }
+// Event Visualizaiton Ch (from CSV). Columns are: event_id, gene_name, genomic_start. genomic_end, transcript_ids
+// vis_aggr_file_ch = Channel.fromPath(params.visualisation.aggregation_csv).splitCsv(header: false).map { tuple ( it[0], it[1], it[2], it[3], it[4..-1]) }
+
+// Event Coordinates. Columns are: event_id, event_coordinates
+event_coord_ch = Channel.fromPath(params.visualisation.event_coords).splitCsv(header: false). map { tuple ( it[0], it[1..-1]) }
+
+// Event Transcripts. Columns are: event_id, gene_name, transcript_ids
+event_tr_ch =  Channel.fromPath(params.visualisation.event_transcripts).splitCsv(header: false). map { tuple ( it[0], it[1], it[2..-1]) }
+
+
+// Combine Ch
+event_ch = event_tr_ch.combine ( event_coord_ch, by: 0 )
 
 // Duplicate vis_ch to select GTF files and PFAM outputs independently
 vis_aggr_ch.into { vis_gtf_ch ; vis_pfam_ch }
@@ -270,9 +280,10 @@ process visualisation_event {
 	params.vis & params.vis_event
 		
 	input:
-	set val(event_id), val(gene_id), val(gen_start), val(gen_end), val(transcript_ids) from vis_aggr_file_ch 
+	//set val(event_id), val(gene_id), val(gen_start), val(gen_end), val(transcript_ids) from vis_aggr_file_ch 
 	file ('gtf_path/*') from vis_gtf_all_ch
 	file ('pfam_path/*') from vis_pfam_all_ch
+	set val(event_id), val(gene_id), val(transcript_ids), val(event_coords) from event_ch
 	
 	output:
 	file("*.rds")
@@ -286,9 +297,8 @@ process visualisation_event {
 	Visualisation-AS-Event-v2.R \
 		--transcript_ids "${transcript_ids}" \
 		--event_id "${event_id}" \
-		--genomic_start "${gen_start}" \
-		--genomic_end "${gen_end}" \
-		--gene_id "${gene_id}" \
+		--event_coords "${event_coords}" \
+		--gene_id ${gene_id} \
 		--genome_id {genome_id} \
 		--pfam_path "pfam_path/" \
 		--gtf_path "gtf_path/" \

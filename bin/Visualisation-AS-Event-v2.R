@@ -31,18 +31,11 @@ option_list = list(
     help = 'Gene ID (in HGNC Format) of the Alternative Splicing Event'
   ),
   make_option(
-    c("-s", "--genomic_start"),
+    c("-s", "--event_coords"),
     action = "store",
     default = NULL,
     type = 'numeric',
-    help = 'Genomic Start coordinates of the Event to represent (Will not be represented if input is NULL)'
-  ), 
-  make_option(
-    c("-n", "--genomic_end"),
-    action = "store",
-    default = NULL,
-    type = 'numeric',
-    help = 'Genomic End coordinates of the Event to represent (Will not be represented if input is NULL)'
+    help = 'Event Coordinates to represent in plot (Will not be represented if input is NULL)'
   ), 
   make_option(
     c("-a", "--genome_id"),
@@ -201,10 +194,17 @@ genome.track.fun <- function(){
   list("Genome.Track" = gtrack)
 }
 
-event.track.fun <- function(gen.start, gen.end, chr, gen){
+event.track.fun <- function(event_coords, chr, gen){
   # Generate Track with Coordinates of Aggregation Event
-  ev.track <- GeneRegionTrack(rstarts = gen.start,
-                              rends = gen.end,
+  ## Sort increasingly
+  event_coords <- sort(event_coords, decreasing = F)
+  ## Start
+  rstarts <- event_coords[seq_along(event_coords) %%2 == 1]
+  ## End
+  rends <- event_coords[seq_along(event_coords) %%2 == 0]
+  
+  ev.track <- GeneRegionTrack(rstarts = rstarts,
+                              rends = rends,
                               genome = gen,
                               chromosome = chr,
                               name = "event.track", 
@@ -235,8 +235,7 @@ transcript_ids <- opt$transcript_ids
 genome_id <- opt$genome_id
 gene_id <- opt$gene_id
 event_id <- opt$event_id
-genomic_start <- as.numeric(opt$genomic_start) # If not numeric(no event coords provided), will return NAs
-genomic_end <- as.numeric(opt$genomic_end)
+event_coords <- opt$event_coords
 ## 0.2 Input file paths
 pfam_path <- opt$pfam_path
 gtf_path <- opt$gtf_path
@@ -245,13 +244,17 @@ out.rds.file.name <- opt$vis_track_list
 out.pdf.file.name <- opt$vis_track_plot
 pfam.gen.coords <- opt$pfam_genomic_coord
 ## 0.3. Read Cytoband information from UCSC, required to generate the chromosome Ideogram without connection to the UCSC server
+print("A")
 if(!(is.null(opt$cytoBand))) { cytoBand <- read.table(opt$cytoBand, header = T, sep = "\t") }
-
+print("B")
 # 1) Transcript IDs to represent together
-transcript_ids <-  opt$transcript_ids
 replace_chars <- c("[][]", " ") # Replace the square brackets --> nextflow inputs transcript_ids tuple as a value --> "[tr_id_1, tr_id_2]"
-for (char in replace_chars){ transcript_ids <-  gsub(transcript_ids, pattern = char, replacement = "") }
+for (char in replace_chars){ 
+  transcript_ids <-  gsub(transcript_ids, pattern = char, replacement = "")
+  event_coords <- gsub(event_coords, pattern = char, replacement = "")
+  }
 transcript_ids <- unlist(strsplit(transcript_ids , ","))# split by comma
+event_coords <- as.numeric(unlist(strsplit(event_coords , ",")))# split by comma
 
 # 2. Transcript Model Track 
 ## File paths
@@ -340,10 +343,11 @@ chr <- unique(unlist(lapply(transcript.pfam.track.list, function(track) track@ch
 if(length(chr) > 1 | is.na(chr)) { warning(paste0("The transcripts provided ", transcript_ids, " belong to more than one chromosome"))}
 chr.track <- chr.track.fun(genome = genome_id, chr = chr, cyto.band = cytoBand)
 ## 5.3.  Event Track (if coordinates available)
-if(is.na(genomic_start) | is.na(genomic_end)) {
+
+if(any(any(is.na(event_coords)))) {
 	event.track <- list(NULL)
 	}else{
-	event.track <- event.track.fun(gen.start = genomic_start, gen.end = genomic_end, chr = chr, gen = genome_id)
+	event.track <- event.track.fun(event_coords = event_coords, chr = chr, gen = genome_id)
 }
 
 # 6. Collect Tracks 
@@ -351,7 +355,7 @@ track.list <- c(chr.track,
                 genome.track,
                 event.track,
                 transcript.pfam.track.list
-	)
+)
 ## 6.1 Rm NULL tracks 
 track.list <- track.list[!unlist(lapply(track.list, is.null))]
 

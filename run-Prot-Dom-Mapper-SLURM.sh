@@ -1,13 +1,13 @@
 #!/bin/bash
 
-#SBATCH --nodes=1
-#SBATCH --job-name="missing-66-transcripts"
-#SBATCH -o slurm-logs/slurm-%j.out
-#SBATCH -e slurm-logs/slurm-%j.err
+#SBATCH --nodes=3
+#SBATCH --job-name="All-PC-Event-Vis"
+#SBATCH --output=logs/slurm-%j.out
+#SBATCH --error=logs/slurm-%j.err
 #SBATCH --qos=bsc_ls
 #SBATCH --ntasks-per-node=48
 #SBATCH --cpus-per-task=1
-#SBATCH --time "24:00:00"
+#SBATCH --time "48:00:00"
  
 # Run AS_Functional_Evaluator nextflow pipeline
 
