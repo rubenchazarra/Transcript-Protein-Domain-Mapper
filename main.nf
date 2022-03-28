@@ -143,31 +143,31 @@ process merge_pfam {
 }
 
 // Extract PFAM alignment genomic coordinates [EnsemblDB]
-process map_genomic_coord_ens {
-	tag "Genomic Coords EnsDB: $transcript_id"
-	
-	publishDir "${results_dir}/5.PFAM-GenCoords-EnsemblDB", mode: 'copy',
-	    saveAs: {filename ->
-	    	if (filename.indexOf(".txt") > 0) "$filename"
-	    }
-	
-	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	
-	input:
-	set val(transcript_id), file(transcript_gtf), file(pfam_al) from pfam_genomic_coord_ens_ch
-	output:
-	set val(transcript_id), file(transcript_gtf), file("${transcript_id}-PFAM-GenCoords-EnsemblDB.txt") into merge_gcoords_ens_ch
-	
-	script:
-	"""
-	${r_module_load}
-	Map-PFAM-to-genomic-coord-EnsemblDB.R \
-		--pfam_al ${pfam_al} \
-		--gtf ${transcript_gtf} \
-		--transcript_id  ${transcript_id} \
-		--output_coord  "${transcript_id}-PFAM-GenCoords-EnsemblDB.txt" \
-	"""
-}
+//process map_genomic_coord_ens {
+//	tag "Genomic Coords EnsDB: $transcript_id"
+//	
+//	publishDir "${results_dir}/5.PFAM-GenCoords-EnsemblDB", mode: 'copy',
+//	    saveAs: {filename ->
+//	    	if (filename.indexOf(".txt") > 0) "$filename"
+//	    }
+//	
+//	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+//	
+//	input:
+//	set val(transcript_id), file(transcript_gtf), file(pfam_al) from pfam_genomic_coord_ens_ch
+//	output:
+//	set val(transcript_id), file(transcript_gtf), file("${transcript_id}-PFAM-GenCoords-EnsemblDB.txt") into merge_gcoords_ens_ch
+//	
+//	script:
+//	"""
+//	${r_module_load}
+//	Map-PFAM-to-genomic-coord-EnsemblDB.R \
+//		--pfam_al ${pfam_al} \
+//		--gtf ${transcript_gtf} \
+//		--transcript_id  ${transcript_id} \
+//		--output_coord  "${transcript_id}-PFAM-GenCoords-EnsemblDB.txt" \
+//	"""
+//}
 
 // Add protein fasta to channel
 pfam_genomic_coord_gtf_ch =  pfam_genomic_coord_ch. combine ( protein_fasta_ch, by: 0 ) 
@@ -334,26 +334,26 @@ process merge_gencoords_GTF {
 }
 
 // Collect GenCoords-EnsemblDB
-merge_gcoords_ens_ch = merge_gcoords_ens_ch.map { it -> it[2] }.collect()
+//merge_gcoords_ens_ch = merge_gcoords_ens_ch.map { it -> it[2] }.collect()
 
 // Merge Genomic coordinates from EnsemblDB Approach
-process merge_gencoords_EnsDB {
-	tag "Merge PFAM GenCoords EnsemblDB" 
-	publishDir "${results_dir}/5.PFAM-GenCoords-EnsemblDB-Merged/",  mode: 'copy'
-	
-	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
-	
-	input:
-	file("genomic-coord-pfam/") from merge_gcoords_ens_ch
-	
-	output:
-	file("PFAM-GenCoords-EnsemblDB-Merged.txt") 
-	
-	script:
-	"""
-	${r_module_load}
-	Merge-tables.R \
-		--input_tables genomic-coord-pfam/ \
-		--output_df "PFAM-GenCoords-EnsemblDB-Merged.txt"
-	"""
-}
+//process merge_gencoords_EnsDB {
+//	tag "Merge PFAM GenCoords EnsemblDB" 
+//	publishDir "${results_dir}/5.PFAM-GenCoords-EnsemblDB-Merged/",  mode: 'copy'
+//	
+//	errorStrategy { task.exitStatus == 1 ? 'ignore' : 'ignore' }
+//	
+//	input:
+//	file("genomic-coord-pfam/") from merge_gcoords_ens_ch
+//	
+//	output:
+//	file("PFAM-GenCoords-EnsemblDB-Merged.txt") 
+//	
+//	script:
+//	"""
+//	${r_module_load}
+//	Merge-tables.R \
+//		--input_tables genomic-coord-pfam/ \
+//		--output_df "PFAM-GenCoords-EnsemblDB-Merged.txt"
+//	"""
+//}

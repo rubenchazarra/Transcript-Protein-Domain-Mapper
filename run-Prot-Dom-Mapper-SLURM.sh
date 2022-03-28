@@ -1,11 +1,11 @@
 #!/bin/bash
 
 #SBATCH --nodes=3
-#SBATCH --job-name="All-PC-Event-Vis"
+#SBATCH --job-name="DSE-Nord3"
 #SBATCH --output=logs/slurm-%j.out
 #SBATCH --error=logs/slurm-%j.err
 #SBATCH --qos=bsc_ls
-#SBATCH --ntasks-per-node=48
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --time "48:00:00"
  
