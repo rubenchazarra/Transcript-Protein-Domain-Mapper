@@ -205,16 +205,17 @@ transcript.track <- gene.track.v2(gen.coords =  transcript_model,
 
 # 2. PFAM alignment Tracks
 ## 2.1. PFAM genomic coordinates (GC)
-pfam.gc <- read.table(file = pfam.gen.coords, 
-                                 header = T, 
-                                 sep = "\t", 
-                                 quote = "\"")
+pfam.gc <- read.table(file = pfam.gen.coords, header = T, sep = "\t",  quote = "\"")
 ## 2.2. Subset by domain partiality --> To deal with transcripts mapping to a ton of domains
-pfam.gc <- pfam.gc[order(pfam.gc[["partiality"]], decreasing = T), ]
-if(length(unique(pfam.gc[["pfam_alignment_id"]])) > 10 ) { pfam.gc <- pfam.gc[1:10, ] }
+if(length(unique(pfam.gc[["pfam_alignment_id"]])) > 10 ) {
+    uniq.alignments <- unique( pfam.gc[ , c("pfam_alignment_id", "partiality")] )
+    ord.uniq.alignment.ids <- uniq.alignments[order(uniq.alignments[["partiality"]], decreasing = T), "pfam_alignment_id"]
+    ord.uniq.alignment.ids <- ord.uniq.alignment.ids[1:10, ]
+    pfam.gc <- pfam.gc[ pfam.gc[["pfam_alignment_id"]] %in% ord.uniq.alignment.ids, ]
+  }
   
 ## 2.3. Generate alignment tracks
-pfam.track.list <- if (all(pfam.gc[["pfam_match"]]) == T ) {
+pfam.track.list <- if (all(!is.na(pfam.gc[["pfam_domain"]]))) {
   ### Parse
   pfam.gc.gviz <- parse.pfam(pfam.gc = pfam.gc)
   ## Add domain name & partiality
@@ -229,21 +230,17 @@ pfam.track.list <- if (all(pfam.gc[["pfam_match"]]) == T ) {
     # Label
     plot.label <- unique(paste0(coords.df[["domain_name"]], "(P=", round(partiality, 2), ")"))
     ## Tracks
-    gene.track.v2(gen.coords = coords.df, 
-                  which = "pfam", 
-                  genome = genome_id, 
-                  group.id = "pfam", 
-                  plot.label = plot.label)
+    gene.track.v2(gen.coords = coords.df, which = "pfam", genome = genome_id, group.id = "pfam", plot.label = plot.label)
   })
   ## Unlist (function already outputs a list))
   al.tracks <- unlist(al.tracks, recursive = F)
-  } else if(all(pfam_al[["pfam_match"]]) == F ){ NULL }
+  } else { NULL }
 
 # 3. Other tracks
 ## 3.1. Genome Track
 genome.track <- genome.track.fun()
 ## 3.2. Chromosome Track
-chr <- as.character(unique(pfam.gc$seqnames)[!is.na(unique(pfam.gc$seqnames))]) # skip NAs if there are
+chr <- as.character(unique(transcript_model$seqnames)[!is.na(unique(transcript_model$seqnames))]) # skip NAs if there are
 chr.track <- chr.track.fun(genome = genome_id, chr = chr, cyto.band = cytoBand)
 
 # 4. Collect Tracks 

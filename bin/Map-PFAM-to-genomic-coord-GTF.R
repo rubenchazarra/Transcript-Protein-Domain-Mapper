@@ -318,7 +318,8 @@ create.empty.iranges.pfam <- function(transcript_id, chrN) {
                    "exon_number",  
                    "cds_ok",  
                    "protein_start",  
-                   "protein_end" )
+                   "protein_end", 
+                   "partiality")
   
   empty.align <- rep(c(NA), times = length(table.names))
   names(empty.align) <- table.names

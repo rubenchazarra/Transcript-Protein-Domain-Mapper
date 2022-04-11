@@ -51,7 +51,8 @@ tbl.to.df <- function(tb, transcript_id){
     # Add transcript name
     df[["query_name"]] <- transcript_id
     df[["pfam_match"]] <- FALSE
-  } else {
+  
+} else {
     df <- data.frame(tb)
     df[["pfam_match"]] <- TRUE
   }

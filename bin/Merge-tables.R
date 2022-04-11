@@ -29,8 +29,10 @@ opt <- parse_args(OptionParser(option_list=option_list))
 files = list.files(opt$input_tables, pattern = ".txt", full.names = T)
 file.list = lapply(files, read.table, header = T, sep = "\t", quote = "\"")
 # 2. Merge files to single df
-df = Reduce(rbind, file.list)
+df = data.table::rbindlist(file.list)
+
 ## Add rownames (avoid duplicates)
 rownames(df) = c(1:nrow(df))
+
 # 3. Save file
 write.table(df, file = opt$output_df, sep = "\t", quote = F, row.names = T)
