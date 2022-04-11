@@ -1,16 +1,15 @@
 #!/usr/bin/env Rscript
 
 # This Script Generates Visualization of Transcript Gene Model + the PFAM alignments of the corresponding Transcript
-# The Goal is to represent the Alternative Splicing Event. The transcripts involved in each AS event are defined in an external Aggregation CSV
-# TODO: Extract transcript genomic coordinates from GTF and not from EnsmblDB for consistency
-## Vulnerability 1): Maybe using list.files when there are a ton of files in the path is not optimal
-## Vul 2) : mapply() works for integrating 2 lists, if we have > 2 transcripts, this will fail. 
+# Input file is a DF containing the PFAM mappings from each Transcript associated to the Event
+
+## TODO: Deal with possibility that no Event Coordinates are provided
 
 suppressPackageStartupMessages(require("optparse"))
 
 option_list = list(
   make_option(
-    c("-i", "--transcript_ids"),
+    c("-i", "--event_pfam_gc"),
     action = "store",
     default = NA,
     type = 'character',
@@ -31,26 +30,12 @@ option_list = list(
     help = 'Gene ID (in HGNC Format) of the Alternative Splicing Event'
   ),
   make_option(
-    c("-s", "--event_coords"),
-    action = "store",
-    default = NA,
-    type = 'character',
-    help = 'Event Coordinates to represent in plot (Will not be represented if input is NULL)'
-  ), 
-  make_option(
     c("-a", "--genome_id"),
     action = "store",
     default = "hg38",
     type = 'character',
     help = 'UCSC Genome Browser assembly ID. Latest IDs for Human and Mouse genomes are "hg38", and "mm39" respectively'
   ),
-  make_option(
-    c("-p", "--pfam_path"),
-    action = "store",
-    default = NA,
-    type = 'character',
-    help = 'Path to the directory where the PFAM alignments Genomic Coordinates of the differents Transcripts to represent are located.'
-  ), 
   make_option(
     c("-t", "--gtf_path"),
     action = "store",
@@ -59,25 +44,18 @@ option_list = list(
     help = 'Path to the directory where the GTF files of the transcripts to be represented are located (These are a subset of the GTF annotation file containing only the query transcript.'
   ), 
   make_option(
-    c("-c", "--cytoBand"),
+    c("-c", "--cyto_band"),
     action = "store",
     default = NA,
     type = 'character',
     help = 'Path to the UCSC Browser Cyto Band table. To download cytoband files for genomes hosted at UCSC, see the UCSC Table Browser, and select Group="All Tables" and Table="cytoBand".'
-  ), 
+  ),
   make_option(
-    c("-o", "--vis_track_list"),
+    c("-s", "--show_non_overlapping"),
     action = "store",
     default = NA,
-    type = 'character',
-    help = 'Path to the output RDS object storing lists of GViz Tracks for vizualization.'
-  ), 
-  make_option(
-    c("-v", "--vis_track_plot"),
-    action = "store",
-    default = NA,
-    type = 'character',
-    help = 'Path to the PDF file with the Track Plots.'
+    type = 'logical',
+    help = 'If True, PFAM domains not overlapping with AS Event coordinates will be displayed'
   )
 )
 
@@ -231,32 +209,29 @@ save.plot.pdf <- function(track.list, plot.title, file.name ){
 ## Execute
 # 0. Params
 ## 0.1. Input params
-transcript_ids <- opt$transcript_ids
-genome_id <- opt$genome_id
-gene_id <- opt$gene_id
 event_id <- opt$event_id
-event_coords <- opt$event_coords
-## 0.2 Input file paths
-pfam_path <- opt$pfam_path
-gtf_path <- opt$gtf_path
-## 0.3. Output file names
-out.rds.file.name <- opt$vis_track_list
-out.pdf.file.name <- opt$vis_track_plot
-pfam.gen.coords <- opt$pfam_genomic_coord
-## 0.3. Read Cytoband information from UCSC, required to generate the chromosome Ideogram without connection to the UCSC server
-if(!(is.null(opt$cytoBand))) { cytoBand <- read.table(opt$cytoBand, header = T, sep = "\t") }
+gene_id <- opt$gene_id
+genome_id <- opt$genome_id 
+show_non_overlapping <- opt$show_non_overlapping
 
-# 1) Transcript IDs to represent together
-replace_chars <- c("[][]", " ") # Replace the square brackets --> nextflow inputs transcript_ids tuple as a value --> "[tr_id_1, tr_id_2]"
-for (char in replace_chars){ 
-  transcript_ids <-  gsub(transcript_ids, pattern = char, replacement = "")
-  event_coords <- gsub(event_coords, pattern = char, replacement = "")
-  }
-transcript_ids <- unlist(strsplit(transcript_ids , ","))# split by comma
-event_coords <- as.numeric(unlist(strsplit(event_coords , ",")))# split by comma
-event_coords <- event_coords[!is.na(event_coords)]
-print(event_coords)
+## 0.2 Input file paths
+event.pfam.gc <- opt$event.pfam.gc
+gtf_path <- opt$gtf_path
+
+# 1. Read files
+
+## 1.1 PFAM genomic coordinates
+event.pfam.gc <- readRDS(opt$event_pfam_gc)
+# Extract values
+#event_id <- unique(event.pfam.gc[["Event.ID"]])
+transcript_ids <- unique(event.pfam.gc[["transcript_id"]])
+#gene_id <- unique(event.pfam.gc[["gene.name"]])
+
+## 1.2 Cyto Band information: from UCSC ( required to generate the chromosome Ideogram )
+if(!(is.null(opt$cyto_band))) { cyto_band <- read.table(opt$cyto_band, header = T, sep = "\t") }
+
 # 2. Transcript Model Track 
+
 ## File paths
 transcript.gc.paths <- list.files(path = gtf_path, full.names = T)
 ## Run
@@ -273,35 +248,39 @@ transcript.track.list <- lapply(transcript_ids, function(transcript_id){
   ## 1.3. Read GTF
   transcript.track <- gene.track.v2(gen.coords =  transcript_model, 
                                     which = "transcript",
-                                    genome = genome_id, # this is hard-coded to human genome
+                                    genome = genome_id, # I think this could be rm from here
                                     group.id = "transcript", # for track labeling
                                     plot.label = transcript_id ) # for track labeling
 })
 ## Add names
 names(transcript.track.list) <- transcript_ids
 
-
 # 3. PFAM alignment Tracks
-## File paths
-pfam.gc.paths <- list.files(path = pfam_path, full.names = T)
-## Run
-pfam.track.list <- lapply(transcript_ids, function(transcript_id){
+## Split pfam genomic Coord DF by transcript
+event.pfam.gc.list <- split(event.pfam.gc, event.pfam.gc[["transcript_id"]])
 
-  pfam.gc.path <- grep(transcript_id, pfam.gc.paths, value = T)
-  
-  if(length(pfam.gc.path) > 1) stop(paste0("More than 1 file matching transcript ", transcript_id, " \n In ", pfam_path))
-  ## 3.1. PFAM genomic coordinates (GC)
-  pfam.gc <- read.table(file = pfam.gc.path, header = T, sep = "\t", quote = "\"")
-  # TODO FUTURE: Subset by proximity to Event Coordinates! Here we do not have event coordinate (Next step)
-  ## 3.2. Subset by domain partiality --> To deal with transcripts mapping to a ton of domains
-  
+## Filter Domains that do not overlap
+event.pfam.gc.list <-  if(show_non_overlapping){
+  event.pfam.gc.list
+  } else {
+  # Filter to only overlapping
+  lapply(event.pfam.gc.list, function(df){
+  df <- df[df[["overlap.domain.event"]] == T, ]
+  df })
+}
+
+## Run
+pfam.track.list <- lapply(event.pfam.gc.list, function(pfam.gc){
+  # Not empty alignments
+  if(!is.null(pfam.gc) | all(is.na(pfam.gc[["overlap.domain.event"]]))){
+    
   if(length(unique(pfam.gc[["pfam_alignment_id"]])) > 10 ) {
     uniq.alignments <- unique( pfam.gc[ , c("pfam_alignment_id", "partiality")] )
     ord.uniq.alignment.ids <- uniq.alignments[order(uniq.alignments[["partiality"]], decreasing = T), "pfam_alignment_id"]
     ord.uniq.alignment.ids <- ord.uniq.alignment.ids[1:10, ]
     pfam.gc <- pfam.gc[ pfam.gc[["pfam_alignment_id"]] %in% ord.uniq.alignment.ids, ]
   }
-
+  
   ## 2.3. Generate alignment tracks
   pfam.track.list <- if (all(!is.na(pfam.gc[["pfam_domain"]]))) {
     ### Parse
@@ -326,14 +305,14 @@ pfam.track.list <- lapply(transcript_ids, function(transcript_id){
     })
     ## Unlist (function already outputs a list))
     al.tracks <- unlist(al.tracks, recursive = F)
-  } else { NULL }
+  }} else { NULL }
 })
 
-## Add names
-names(pfam.track.list) <- transcript_ids
+## Add names <-- Names already there
+#names(pfam.track.list) <- transcript_ids
 
 ## 4. Integrate lists
-transcript.pfam.track.list <- mapply(function(list.1, list.2) c(list.1, list.2), transcript.track.list, pfam.track.list)
+transcript.pfam.track.list <- mapply(function(list.1, list.2) c(list.1, list.2), transcript.track.list, pfam.track.list, SIMPLIFY = F)
 transcript.pfam.track.list <- unlist(transcript.pfam.track.list, recursive = F)
 
 # 5. Other tracks 
@@ -342,13 +321,21 @@ genome.track <- genome.track.fun()
 ## 5.2. Chromosome Track
 chr <- unique(unlist(lapply(transcript.pfam.track.list, function(track) track@chromosome)))
 if(length(chr) > 1 | is.na(chr)) { warning(paste0("The transcripts provided ", transcript_ids, " belong to more than one chromosome"))}
-chr.track <- chr.track.fun(genome = genome_id, chr = chr, cyto.band = cytoBand)
-## 5.3.  Event Track (if coordinates available)
+chr.track <- chr.track.fun(genome = genome_id, chr = chr, cyto.band = cyto_band)
 
-if(any(any(is.na(event_coords)))) {
-	event.track <- list(NULL)
-	}else{
-	event.track <- event.track.fun(event_coords = event_coords, chr = chr, gen = genome_id)
+## 5.3.  Event Track (if coordinates available)
+event_coords <- as.character(unique(event.pfam.gc[["event.coords"]]))
+event_coords <- as.numeric(unlist(strsplit(event_coords, split = "; ")))
+print(event_coords)
+## Event Track
+if(any(is.na(event_coords))){
+  event_coords <- event_coords[!is.na(event_coords)]
+  print(event_coords)
+  event.track <- event.track.fun(event_coords = event_coords, chr = chr, gen = genome_id)
+} else if( all(is.na(event_coords))){
+  event.track <- NULL
+} else {
+  event.track <- event.track.fun(event_coords = event_coords, chr = chr, gen = genome_id)
 }
 
 # 6. Collect Tracks 
@@ -362,10 +349,13 @@ track.list <- track.list[!unlist(lapply(track.list, is.null))]
 
 # 7. Save
 ## 7.1. Save track list
-saveRDS(track.list, file = out.rds.file.name)
+file.name.rds <- paste(gene_id, event_id, paste0(unlist(transcript_ids), collapse = "_"), "Visualisation.rds", sep = "_")
+saveRDS(track.list, file = file.name.rds)
+
 ## 7.2. Save plot PDF
 plot_title <- paste0(gene_id, " - ", event_id, "\n Transcripts: ", paste(transcript_ids, collapse = " - ") )
+file.name.pdf <- paste(gene_id, event_id, paste0(unlist(transcript_ids), collapse = "_"), "Visualisation.pdf", sep = "_")
 
 save.plot.pdf(track.list = track.list, 
               plot.title = plot_title, 
-              file.name = out.pdf.file.name)
+              file.name = file.name.pdf)

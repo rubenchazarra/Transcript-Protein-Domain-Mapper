@@ -1,11 +1,11 @@
 #!/bin/bash
 
 #SBATCH --nodes=1
-#SBATCH --job-name="missing-66-transcripts"
-#SBATCH -o slurm-logs/slurm-%j.out
-#SBATCH -e slurm-logs/slurm-%j.err
+#SBATCH --job-name="DSE-Nord3"
+#SBATCH --output=logs/slurm-%j.out
+#SBATCH --error=logs/slurm-%j.err
 #SBATCH --qos=bsc_ls
-#SBATCH --ntasks-per-node=48
+#SBATCH --ntasks-per-node=16
 #SBATCH --cpus-per-task=1
 #SBATCH --time "24:00:00"
  
@@ -30,4 +30,4 @@ nextflow run "${source_dir}/main.nf" \
         -with-timeline "${report_dir}/timeline.html" \
 	-with-dag "${report_dir}/flowchart.png" \
 	-profile slurm \
-	-resume pedantic_torvalds
+	#-resume awesome_banach
