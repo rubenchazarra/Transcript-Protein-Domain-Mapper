@@ -229,6 +229,8 @@ process map_genomic_coord_gtf {
 	
 	output:
 	set val(transcript_id), file(transcript_gtf), file("${transcript_id}-PFAM-GenCoords-GTF.txt") into merge_gcoords_pfam_ch, vis_transcript_ch, vis_aggr_ch
+	set val(transcript_id), file(transcript_gtf) into aggr_gtf_ch
+	set val(transcript_id), file("${transcript_id}-PFAM-GenCoords-GTF.txt") into aggr_gc_ch
 	
 	script:
 	"""
@@ -288,19 +290,51 @@ process visualisation_transcript {
 event_coord_ch = Channel.fromPath(params.visualisation.event_coords).splitCsv(header: false). map { tuple ( it[0], it[1..-1]) }
 
 // Event Transcripts. Columns are: event_id, gene_name, transcript_ids
-event_tr_ch =  Channel.fromPath(params.visualisation.event_transcripts).splitCsv(header: false). map { tuple ( it[0], it[1], it[2..-1]) }
+// event_tr_ch =  Channel.fromPath(params.visualisation.event_transcripts).splitCsv(header: false). map { tuple ( it[0], it[1], it[2..-1]) }
+
+///////////// Eliminating need to wait for all transcripts to run
+// Vulnerabilities: Same event ID with different transcript_ids would get mixed up ?¿?
+
+// 1) Read Event Aggregation file. Columns are: event_id, gene_name, transcript_ids
+event_tr_ch = Channel.fromPath(params.visualisation.event_transcripts) . splitCsv(header: false)
+
+// 2) Group transcript ids in tuple (N of transcripts can vary)
+event_tr_reord_ch = event_tr_ch . map { tuple ( it[0], it[1], it[2..-1]) }
+
+// 3) i) Transpose ch (to have one ch per transcript); ii) Rearrange ch order (transcript_id, event_id, gene_id); and iii) Duplicate
+event_tr_reord_ch . transpose () . map { tuple( it[2], it[0], it[1]) } into { event_tr_1_ch; event_tr_2_ch }
+
+// 4.1) Combine channels with GTF file
+event_tr_gtf_ch = event_tr_1_ch . combine ( aggr_gtf_ch, by : 0)
+// 4.2) Combine channels with PFAM file
+event_tr_pfam_ch = event_tr_2_ch . combine ( aggr_gc_ch, by : 0)
+
+// 5) Group transcript instances back by Event ID and gene_id, and reorder 
+event_tr_gtf_2_ch = event_tr_gtf_ch . groupTuple( by: [1, 2] ) . map{ tuple( it[1], it[2], it[0], it[3]) } 
+single_tr_pfam_2_ch = event_tr_pfam_ch . groupTuple( by: [1, 2] ) . map{ tuple( it[1], it[2], it[0], it[3]) }
+
+// 6)  Integrate GTF and PFAM channels
+event_tr_gtf_pfam_ch = event_tr_gtf_2_ch . mix( single_tr_pfam_2_ch ). groupTuple( by : [0, 1] )
+
+// 7) Rearrange ch (transcript ids are duplicated, and flatten file tuple)
+event_tr_gtf_pfam_2_ch = event_tr_gtf_pfam_ch . map { tuple ( it[0], it[1], it[2][0], it[3][0], it[3][1])} .view()
+
+// 8) Merge file ch with event coordinates ch
+event_tr_coords_ch = event_tr_gtf_pfam_2_ch . combine( event_coord_ch, by: 0)
+
+///////////// END TESTING AREA
 
 // Combine Ch
-event_ch = event_tr_ch.combine ( event_coord_ch, by: 0 )
-
-// Duplicate vis_ch to select GTF files and PFAM outputs independently
-vis_aggr_ch.into { vis_gtf_ch ; vis_pfam_ch }
-
-// GTF Channel // Collect GTF Files
-vis_gtf_all_ch = vis_gtf_ch.map{ it[1] }.collect()
-
-// PFAM Gen-Coord Channel // Collect PFAM Genomic Coordinate Files 
-vis_pfam_all_ch = vis_pfam_ch.map{ it[2] }.collect()
+//event_ch = event_tr_ch.combine ( event_coord_ch, by: 0 )
+//
+//// Duplicate vis_ch to select GTF files and PFAM outputs independently
+//vis_aggr_ch.into { vis_gtf_ch ; vis_pfam_ch }
+//
+//// GTF Channel // Collect GTF Files
+//vis_gtf_all_ch = vis_gtf_ch.map{ it[1] }.collect()
+//
+//// PFAM Gen-Coord Channel // Collect PFAM Genomic Coordinate Files 
+//vis_pfam_all_ch = vis_pfam_ch.map{ it[2] }.collect()
 
 // Aggregate by Event
 process aggr_event {
@@ -317,9 +351,9 @@ process aggr_event {
 		
 	input:
 	//set val(event_id), val(gene_id), val(gen_start), val(gen_end), val(transcript_ids) from vis_aggr_file_ch 
-	file ('pfam_path/*') from vis_pfam_all_ch
-	set val(event_id), val(gene_id), val(transcript_ids), val(event_coords) from event_ch
-
+	//file ('pfam_path/*') from vis_pfam_all_ch
+	//set val(event_id), val(gene_id), val(transcript_ids), val(event_coords) from event_ch
+	set val(event_id), val(gene_id), val(transcript_ids), val(event_coords) from event_tr_coords_ch
 	
 	output:
 	set val(event_id), val(gene_id), file("*_Visualisation.rds") into vis_event_ch
@@ -354,7 +388,7 @@ process visualisation_event {
 	params.vis & params.vis_event
 		
 	input:
-	file ('gtf_path/*') from vis_gtf_all_ch
+	// file ('gtf_path/*') from vis_gtf_all_ch
 	set val(event_id), val(gene_id), val(event_pfam) from vis_event_ch
 	
 	output:
