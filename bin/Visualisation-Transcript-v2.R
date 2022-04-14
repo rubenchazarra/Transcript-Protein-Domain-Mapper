@@ -210,9 +210,9 @@ pfam.gc <- read.table(file = pfam.gen.coords, header = T, sep = "\t",  quote = "
 if(length(unique(pfam.gc[["pfam_alignment_id"]])) > 10 ) {
     uniq.alignments <- unique( pfam.gc[ , c("pfam_alignment_id", "partiality")] )
     ord.uniq.alignment.ids <- uniq.alignments[order(uniq.alignments[["partiality"]], decreasing = T), "pfam_alignment_id"]
-    ord.uniq.alignment.ids <- ord.uniq.alignment.ids[1:10, ]
+    ord.uniq.alignment.ids <- ord.uniq.alignment.ids[1:10]
     pfam.gc <- pfam.gc[ pfam.gc[["pfam_alignment_id"]] %in% ord.uniq.alignment.ids, ]
-  }
+}
   
 ## 2.3. Generate alignment tracks
 pfam.track.list <- if (all(!is.na(pfam.gc[["pfam_domain"]]))) {

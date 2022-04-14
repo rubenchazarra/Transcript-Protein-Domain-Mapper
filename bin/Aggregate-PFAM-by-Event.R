@@ -38,8 +38,15 @@ option_list = list(
     action = "store",
     default = NA,
     type = 'character',
-    help = 'Path to the directory where the PFAM alignments Genomic Coordinates of the differents Transcripts to represent are located.'
-)
+    help = 'Paths of the PFAM alignments Genomic Coordinate files of the differents Transcripts to represent are located.'
+  ), 
+  make_option(
+    c("-f", "--gtf_path"),
+    action = "store",
+    default = NA,
+    type = 'character',
+    help = 'Paths of the GTF files of the differents Transcripts to represent are located.'
+  )
 )
 
 opt <- parse_args(OptionParser(option_list=option_list))
@@ -119,11 +126,10 @@ gene_id <- opt$gene_id
 event_id <- opt$event_id
 event_coords <- opt$event_coords
 ## 0.2 Input file paths
-pfam_gc_path <- opt$pfam_path
-## 0.3. Output file names
-event_pfam <- opt$event_pfam
+pfam_path <- opt$pfam_path
+gtf_path <- opt$gtf_path
 
-# 1) Transcript IDs to represent together
+# 1. Transcript IDs to represent together
 replace_chars <- c("[][]", " ") # Replace the square brackets --> nextflow inputs transcript_ids tuple as a value --> "[tr_id_1, tr_id_2]"
 for (char in replace_chars){ 
   transcript_ids <-  gsub(transcript_ids, pattern = char, replacement = "")
@@ -133,50 +139,64 @@ transcript_ids <- unlist(strsplit(transcript_ids , ","))# split by comma
 event_coords <- as.numeric(unlist(strsplit(event_coords , ",")))# split by comma
 event_coords <- event_coords[!is.na(event_coords)]
 
-# 2. Read PFAM Genomic Coordinates 
-pfam.gc.paths <- list.files(path = pfam_gc_path, full.names = T)
+# 2. Read and save GTFs
+gtf.paths <- list.files(path = gtf_path, pattern = ".gtf", full.names = T)
 ## Run
-pfam.gc.list <- lapply(transcript_ids, function(transcript_id) {
-  
-  # Read transcript PFAM files
-  pfam.gc.path <- grep(transcript_id, pfam.gc.paths, value = T)
-  if(length(pfam.gc.path) > 1) stop(paste0("More than 1 file matching transcript ", transcript_id, " \n In ", pfam_gc_path))
-  
-  pfam.gc <- read.table(file = pfam.gc.path, header = T, sep = "\t", quote = "\"")
+gtf.list <- lapply(transcript_ids, function(transcript_id) {
+  # Find transcript file
+  transcript.gtf <- grep(transcript_id, gtf.paths, value = T)
+  # Read
+  gtf <- rtracklayer::import(transcript.gtf)
+  gtf <- as.data.frame(gtf)
+  gtf
+})
+## Add names
+names(gtf.list) <- transcript_ids
+## Save GTFs for following processes
+saveRDS(gtf.list, file = paste0(paste(transcript_ids,collapse = "-"), "_GTF_list.rds"))
+
+# 3. Read PFAM Genomic Coordinates 
+pfam.paths <- list.files(path = pfam_path, pattern = ".txt", full.names = T)
+## Run
+pfam.list <- lapply(transcript_ids, function(transcript_id) {
+  # Find transcript file
+  transcript.pfam <- grep(transcript_id, pfam.paths, value = T)
+  pfam.gc <- read.table(file = transcript.pfam, header = T, sep = "\t", quote = "\"")
   # Order by exon number
   pfam.gc <- pfam.gc [ order(pfam.gc[["exon_number"]], decreasing = F), ]
   pfam.gc
 })
-# Add names
-names(pfam.gc.list) <- transcript_ids
+## Add names
+names(pfam.list) <- transcript_ids
 
-# 3. Add Event Information 
-pfam.gc.list <- lapply(pfam.gc.list, function(df) add.event.info(df = df, event_id, gene_id, event_coords))
+# 4. Add Event Information 
+pfam.list <- lapply(pfam.list, function(df) add.event.info(df = df, event_id, gene_id, event_coords))
 
-## 4. Collapse PFAM Domain Genomic Coordinate DF to one row per Exon
-pfam.gc.collapse.list <- lapply(pfam.gc.list, collapse.exons.domain)
+# 5. Collapse PFAM Domain Genomic Coordinate DF to one row per Exon
+pfam.collapse.list <- lapply(pfam.list, collapse.exons.domain)
 
-# 5. Domain-Event Coordinate overlap
-pfam.gc.collapse.list <- lapply(pfam.gc.collapse.list, find.coord.overlap)
+# 6. Domain-Event Coordinate overlap
+pfam.collapse.list <- lapply(pfam.collapse.list, find.coord.overlap)
 
-# 6. Collapse per Exon
-pfam.gc.collapse.df <- as.data.frame(data.table::rbindlist(pfam.gc.collapse.list))
-# 7. Save Event Domains (Collapsed, 1 row per domain) 
-## 7.1 RDS
+## PER DOMAIN COORDINATES
+# 7. Collapse per Exon
+pfam.collapse.df <- as.data.frame(data.table::rbindlist(pfam.collapse.list))
+# 8. Save Event Domains (Collapsed, 1 row per domain) 
+## 8.1 Txt
 file.name <- paste(gene_id, event_id, paste0(unlist(transcript_ids), collapse = "_"), "DF.txt", sep = "_")
-write.table(pfam.gc.collapse.df, file = file.name, sep = "\t", row.names = F, col.names = T, quote = F)
-## 7.2 Txt
+write.table(pfam.collapse.df, file = file.name, sep = "\t", row.names = F, col.names = T, quote = F)
+## 8.2 RDS
 file.name <- paste(gene_id, event_id, paste0(unlist(transcript_ids), collapse = "_"), "DF.rds", sep = "_")
-saveRDS(pfam.gc.collapse.df, file = file.name)
+saveRDS(pfam.collapse.df, file = file.name)
 
-## PER EXON
-# 6. Add Domain-Event Coordinate overlap to Per-Exon coord data.frames
-pfam.gc.list <- mapply(function(gc.df, collapse.df){
+## PER EXON COORDINATES
+# 9. Add Domain-Event Coordinate overlap to Per-Exon coord data.frames
+pfam.list <- mapply(function(gc.df, collapse.df){
   merge(gc.df, collapse.df[, c("pfam_alignment_id", "overlap.domain.event")], by = "pfam_alignment_id", all.x = T, all.y = T)
-}, pfam.gc.list, pfam.gc.collapse.list, SIMPLIFY = FALSE)
+}, pfam.list, pfam.collapse.list, SIMPLIFY = FALSE)
 
-# 7. Save Event Domains (per-Exon) for Visualisation step
-pfam.gc.df <- as.data.frame(data.table::rbindlist(pfam.gc.list))
+# 10. Save Event Domains (per-Exon) for Visualisation step
+pfam.df <- as.data.frame(data.table::rbindlist(pfam.list))
 file.name <- paste(event_id, paste0(unlist(transcript_ids), collapse = "_"), "Visualisation.rds", sep = "_")
 
-saveRDS(pfam.gc.df, file = file.name)
+saveRDS(pfam.df, file = file.name)

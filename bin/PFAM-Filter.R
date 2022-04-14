@@ -16,20 +16,6 @@ option_list = list(
   ), 
   # Thresholds
   make_option(
-    c("-s", "--sequence_evalue"),
-    action = "store",
-    default = 10,
-    type = 'numeric',
-    help = 'Sequence E-value threshold. The E-value is the number of hits that would be expected to have a score equal to or better than this value by chance alone. A good E-value is much less than 1.'
-  ), 
-  make_option(
-    c("-c", "--sequence_score"),
-    action = "store",
-    default = 1e-03,
-    type = 'numeric',
-    help = 'Sequence Bit Score. Represents the likelihood of alignment being emitted by the model.'
-  ), 
-  make_option(
     c("-d", "--domain_evalue"),
     action = "store",
     default = 1e-03,
@@ -71,16 +57,14 @@ according to the model).'
 opt <- parse_args(OptionParser(option_list=option_list))
 
 # 0. Params 
-sequence_evalue <- opt$sequence_evalue
-sequence_score <- opt$sequence_score
 domain_evalue <- opt$domain_evalue
 domain_score <- opt$domain_score
 accuracy <- opt$accuracy
 partiality <- opt$partiality
 
 # 0. Checks: Are all values numeric ? 
-threshold.vec <- setNames(c(sequence_evalue, sequence_score, domain_evalue, domain_score, accuracy, partiality),
-                          nm = c("sequence_evalue", "sequence_score", "domain_evalue", "domain_score", "accuracy", "partiality"))
+threshold.vec <- setNames(c( domain_evalue, domain_score, accuracy, partiality),
+                          nm = c("domain_evalue", "domain_score", "accuracy", "partiality"))
 for(i in 1:length(threshold.vec)){
   if(!is.numeric(threshold.vec[i])){
     print(paste0("Threshold:\n", threshold.vec[i], "\n is not numeric. Revise!"))
@@ -95,8 +79,7 @@ transcript.id <- unique(pfam.df[["query_name"]])
 # 2. Filter
 if(all(pfam.df[["pfam_match"]])){
   
-  pfam.df.filt <- pfam.df[pfam.df[["sequence_evalue"]] <= threshold.vec[["sequence_evalue"]] & # Sequence E-Value
-            pfam.df[["sequence_score"]] >= threshold.vec[["sequence_score"]] & # Sequence Bit-score
+  pfam.df.filt <- pfam.df[
             pfam.df[["domain_cevalue"]] <= threshold.vec[["domain_evalue"]] & # Domain conditional E-value
             pfam.df[["domain_ievalue"]] <= threshold.vec[["domain_evalue"]] & # Domain independent E-value
             pfam.df[["domain_score"]] >= threshold.vec[["domain_score"]] & # Domain Bit-score
