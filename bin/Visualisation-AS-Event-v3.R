@@ -9,7 +9,7 @@ suppressPackageStartupMessages(require("optparse"))
 
 option_list = list(
   make_option(
-    c("-i", "--event_pfam_gc"),
+    c("-i", "--event_pfam_list"),
     action = "store",
     default = NA,
     type = 'character',
@@ -37,11 +37,11 @@ option_list = list(
     help = 'UCSC Genome Browser assembly ID. Latest IDs for Human and Mouse genomes are "hg38", and "mm39" respectively'
   ),
   make_option(
-    c("-t", "--gtf_path"),
+    c("-t", "--gtf_list"),
     action = "store",
     default = NA,
     type = 'character',
-    help = 'Path to the directory where the GTF files of the transcripts to be represented are located (These are a subset of the GTF annotation file containing only the query transcript.'
+    help = 'RDS object storing list of GTF of the transcripts to be represented are located (These are a subset of the GTF annotation file containing only the query transcript.'
   ), 
   make_option(
     c("-c", "--cyto_band"),
@@ -53,7 +53,7 @@ option_list = list(
   make_option(
     c("-s", "--show_non_overlapping"),
     action = "store",
-    default = NA,
+    default = TRUE,
     type = 'logical',
     help = 'If True, PFAM domains not overlapping with AS Event coordinates will be displayed'
   )
@@ -66,7 +66,7 @@ suppressPackageStartupMessages(require(rtracklayer))
 suppressPackageStartupMessages(require(dplyr))
 
 ## Functions ## 
-gene.track.v2 <- function(gen.coords, which, genome, group.id, plot.label){
+gene.track <- function(gen.coords, which, genome, group.id, plot.label){
   suppressPackageStartupMessages(require(Gviz))
   ## Generate gene region track (either the full model of transcript or its PFAM domains)
   if(!which %in% c("transcript", "pfam")) stop(paste0("which arg must be one of: transcript or pfam", which, " not valid!" ))
@@ -94,20 +94,19 @@ gene.track.v2 <- function(gen.coords, which, genome, group.id, plot.label){
   return(l)
 }
 
-parse.gtf.v2 <- function(gtf, transcript.id){
+parse.gtf <- function(gtf){
   ## Subset GTF and perform pertinent modifications for visualization by Gviz
-  sub.gtf <- gtf[grep(transcript.id, gtf$transcript_id), ]
-  # Create dataframe --
-  transcript.model <- as.data.frame(sub.gtf)
+  transcript.id <- unique(gtf[["transcript_id"]])
+  transcript.model <- gtf; rm(gtf)
   # Note: 'exon' type in gencode includes UTR+CDS
-  transcript.model <- transcript.model[transcript.model$type %in% c("UTR", "CDS"),]
+  transcript.model <- transcript.model[transcript.model[["type"]] %in% c("UTR", "CDS"),]
   # Rename columns --
-  transcript.model$gene <- transcript.model$gene_name
-  transcript.model$exon <- transcript.model$exon_id
-  transcript.model$transcript <- transcript.model$transcript.id
-  transcript.model$gene <- transcript.model$gene_id
-  direction <- ifelse(transcript.model$strand == "+", "<", ">")
-  transcript.model$symbol <- paste(transcript.model$transcript.id, direction) # label in plot
+  transcript.model[["gene"]] <- transcript.model[["gene_name"]]
+  transcript.model[["exon"]] <- transcript.model[["exon_id"]]
+  transcript.model[["transcript"]] <- transcript.model[["transcript.id"]]
+  transcript.model[["gene"]] <- transcript.model[["gene_id"]]
+  direction <- ifelse(transcript.model$"strand" == "+", "<", ">")
+  transcript.model[["symbol"]] <- paste(transcript.model[["transcript.id"]], direction) # label in plot
   return(transcript.model)
 }
 
@@ -215,13 +214,13 @@ genome_id <- opt$genome_id
 show_non_overlapping <- opt$show_non_overlapping
 
 ## 0.2 Input file paths
-event.pfam.gc <- opt$event.pfam.gc
-gtf_path <- opt$gtf_path
+event.pfam <- opt$event.pfam
+gtf.list <- opt$gtf_list
 
 # 1. Read files
 
 ## 1.1 PFAM genomic coordinates
-event.pfam.gc <- readRDS(opt$event_pfam_gc)
+event.pfam.gc <- readRDS(opt$event_pfam_list)
 # Extract values
 #event_id <- unique(event.pfam.gc[["Event.ID"]])
 transcript_ids <- unique(event.pfam.gc[["transcript_id"]])
@@ -233,27 +232,21 @@ if(!(is.null(opt$cyto_band))) { cyto_band <- read.table(opt$cyto_band, header = 
 # 2. Transcript Model Track 
 
 ## File paths
-transcript.gc.paths <- list.files(path = gtf_path, full.names = T)
+gtf.list <- readRDS(gtf.list)
 ## Run
-transcript.track.list <- lapply(transcript_ids, function(transcript_id){
-  
-  # 2.0 Transcript GTF file path
-  transcript.gc.path <- grep(transcript_id, transcript.gc.paths, value = T)
-  if(length(transcript.gc.path) > 1) stop(paste0("More than 1 file matching transcript ", transcript_id, " \n In ", gtf_path))
-  
-  ## 2.1. Read GTF
-  gtf <- rtracklayer::import(transcript.gc.path)
-  ## 1.2. Parse GTF
-  transcript_model <- parse.gtf.v2(gtf = gtf, transcript.id = transcript_id )
-  ## 1.3. Read GTF
-  transcript.track <- gene.track.v2(gen.coords =  transcript_model, 
+transcript.track.list <- lapply(gtf.list, function(gtf.df){
+  ## Extract transcript ID
+  transcript.id <- unique(gtf.df[["transcript_id"]])
+  ## Parse GTF
+  transcript_model <- parse.gtf(gtf = gtf.df)
+  ## Read GTF
+  transcript.track <- gene.track(gen.coords =  transcript_model, 
                                     which = "transcript",
                                     genome = genome_id, # I think this could be rm from here
                                     group.id = "transcript", # for track labeling
-                                    plot.label = transcript_id ) # for track labeling
+                                    plot.label = transcript.id ) # for track labeling
+  transcript.track
 })
-## Add names
-names(transcript.track.list) <- transcript_ids
 
 # 3. PFAM alignment Tracks
 ## Split pfam genomic Coord DF by transcript
@@ -297,7 +290,7 @@ pfam.track.list <- lapply(event.pfam.gc.list, function(pfam.gc){
       # Label
       plot.label <- unique(paste0(coords.df[["domain_name"]], "(P=", round(partiality, 2), ")"))
       ## Tracks
-      gene.track.v2(gen.coords = coords.df, 
+      gene.track(gen.coords = coords.df, 
                     which = "pfam", 
                     genome = genome_id, 
                     group.id = "pfam", 
